@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Spin the Wheel</title>
+  <style>
+    body, html { margin: 0; padding: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #2c2c2c; }
+    #wheel-container { position: relative; width: 50.5vmin; height: 50.5vmin; cursor: pointer; }
+    canvas { display: block; width: 100%; height: 100%; border-radius: 50%; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
+    #ui-overlay { position: absolute; top: -100px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; pointer-events: none; }
+    #contest-title {margin-top: 20px; background: rgb(38, 38, 219); color: yellow; padding: 0.3em 1em; border-radius: 1em; font-size: calc(1.5em + 8pt); font-weight: bolder; margin-bottom: 8px; white-space: nowrap; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
+    #wheel-label { opacity: 0;background: rgba(0,0,0,0.7); color: #fff; padding: 0.5em 1em; border-radius: 1em; font-size: 1.2em; transition: font-size 0.3s ease; white-space: nowrap; text-shadow: 1px 1px 2px #000; margin-bottom: 6px; }
+    #pointer { transform: translateY(-15px);width: 0; height: 0; border-left: 15px solid transparent; border-right: 15px solid transparent; border-top: 15px solid #ffeb3b; }
+
+    #elimination { display: flex; align-items: flex-start; justify-content: center; gap: 90px; margin-top: 30px; }
+    .box-container { display: flex; flex-direction: column; align-items: center; }
+    .box-label { color: #2c2c2c; font-size: calc(1em + 8pt); white-space: nowrap; margin-bottom: 8px; min-height: calc(1em + 8pt); }
+    .box { width: 180px; height: 180px; border: 3px solid #fff; background: #444; box-sizing: border-box; display: flex; align-items: center; justify-content: center; }
+    .box img { max-width: 100%; max-height: 100%; object-fit: contain; transform: scale(1.5); transform-origin: center center;}
+    .vs { color: #fff; font-size: calc(1.5em + 12pt); font-weight: bold; margin: 0; white-space: nowrap; padding-top: 90px;}
+  
+    #elimination-counter { color: #fff; background-color: #e91e63; padding: 0.3em 1em; border-radius: 1em; font-size: calc(0.7em + 8pt); font-weight: bolder; margin-bottom: 8px; white-space: nowrap; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
+    #comment-banner { color: #fff; background-color: rgb(91, 169, 91); padding: 0.3em 1em; border-radius: 1em; font-size: calc(1em + 8pt); font-weight: bolder; margin-bottom: 8px; white-space: nowrap; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
+
+    
+
+  </style>
+</head>
+<body>
+  <div id="wheel-container">
+    <canvas id="wheel"></canvas>
+    
+  <img
+    id="wheel-center"
+    src="images/masterball.png"
+    alt=""
+    style="
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 120px;    /* match the circle diameter (2×radius) */
+      height: 120px;
+      transform: translate(-50%, -50%);
+      pointer-events: none; /* so clicks still go to the canvas */
+      user-select: none;
+    "
+  >
+    <div id="ui-overlay">
+      <div id="contest-title">Pokemon Elimination Contest!</div>
+      
+      <div id="wheel-label">Click the wheel to spin</div>
+      <div id="pointer"></div>
+    </div>
+  </div>
+  <div id="elimination">
+    <div class="box-container">
+      <div class="box-label" id="label1"></div>
+      <div class="box" id="box1"></div>
+    </div>
+    
+    <div class="vs">VS</div>
+    <div class="box-container">
+      <div class="box-label" id="label2"></div>
+      <div class="box" id="box2"></div>
+    </div>
+  </div>
+  <p id="elimination-counter">Eliminated: 0</p>
+  <p id="comment-banner">Comment whos better!</p>
+  <script>
+    const container = document.getElementById('wheel-container');
+    const canvas = document.getElementById('wheel');
+    const ctx = canvas.getContext('2d');
+    const label = document.getElementById('wheel-label');
+    const box1 = document.getElementById('box1');
+    const box2 = document.getElementById('box2');
+    const label1 = document.getElementById('label1');
+    const label2 = document.getElementById('label2');
+    const counterEl = document.getElementById('elimination-counter');
+
+
+    class Pokemon {
+      constructor(id, name, ball, imageUrl) {
+        this.id = id;
+        this.name = name;
+        this.ball = ball;
+        this.image = new Image(); this.image.src = imageUrl;
+        this.ballImage = new Image(); this.ballImage.src = `images/${ball.toLowerCase()}.png`;
+      }
+    }
+
+    let items = [], eliminationCount = 0, pendingRemovalIdx = null, totalCount = 0;
+    let size, center;
+    const buffer = document.createElement('canvas');
+    const bctx = buffer.getContext('2d');
+
+    fetch('pokeLIST.csv')
+      .then(r => r.text())
+      .then(csvText => {
+        const lines = csvText.trim().split(/\r?\n/);
+        lines.shift();
+        items = lines.map(line => {
+          const [id,name,url,ball] = line.split(',');
+          return new Pokemon(parseInt(id), name, ball, url);
+        });
+        setup();
+      })
+      .catch(err => console.error('Failed to load CSV', err));
+
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playPing() { const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain(); osc.connect(gain); gain.connect(audioCtx.destination); osc.frequency.value = 1000; gain.gain.setValueAtTime(0.2, audioCtx.currentTime); osc.start(); osc.stop(audioCtx.currentTime + 0.05); }
+    function playTaDah() { const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain(); osc.connect(gain); gain.connect(audioCtx.destination); const now = audioCtx.currentTime; osc.frequency.setValueAtTime(600, now); osc.frequency.exponentialRampToValueAtTime(200, now + 0.6); gain.gain.setValueAtTime(0.3, now); gain.gain.exponentialRampToValueAtTime(0.001, now + 0.7); osc.start(now); osc.stop(now + 0.7); }
+
+    function setup() {
+      size = Math.min(window.innerWidth, window.innerHeight) * 0.675;
+      const dim = Math.floor(size);
+      buffer.width = canvas.width = dim;
+      buffer.height = canvas.height = dim;
+      center = dim / 2;
+      drawStaticWheel(); drawWheel(0); updateLabel(0);
+    }
+
+    function drawStaticWheel() {
+      if (!buffer.width) return;
+      const seg = (2 * Math.PI) / items.length;
+      const r = Math.max(center - 30, 0);
+      bctx.clearRect(0,0,buffer.width,buffer.height);
+      items.forEach((_,i)=>{
+        const s = i*seg;
+        bctx.beginPath(); bctx.moveTo(center,center);
+        bctx.arc(center,center,r,s,s+seg);
+        bctx.closePath();
+        bctx.fillStyle = `hsl(${i*360/items.length},70%,60%)`;
+        bctx.fill();
+      });
+      bctx.beginPath(); bctx.arc(center,center,30,0,2*Math.PI);
+      bctx.fillStyle='#fff'; bctx.fill();
+    }
+
+    let lastIndex = -1;
+    function drawWheel(a) {
+      if (!buffer.width) { setup(); return; }
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      ctx.save(); ctx.translate(center,center); ctx.rotate(a);
+      ctx.drawImage(buffer,-center,-center);
+      ctx.restore();
+      const idx = getCurrentIndex(a);
+      if (idx !== lastIndex) { playPing(); lastIndex = idx; }
+    }
+    function getCurrentIndex(a) {
+      const seg = (2*Math.PI)/items.length;
+      let raw = -Math.PI/2 - a;
+      raw = (raw%(2*Math.PI)+2*Math.PI)%(2*Math.PI);
+      return Math.floor(raw/seg);
+    }
+    function updateLabel(a) {
+      if (!items.length) return;
+      label.textContent = items[getCurrentIndex(a)].name;
+    }
+
+    let spinning = false;
+    function startSpin() {
+    // ——— Reset boxes once you’ve already filled box2 ———
+      if (eliminationCount >= 2) {
+        eliminationCount = 0;
+        box1.innerHTML = '';
+        label1.textContent = '';
+        box2.innerHTML = '';
+        label2.textContent = '';
+      }
+      if (pendingRemovalIdx !== null) { items.splice(pendingRemovalIdx,1); pendingRemovalIdx = null; drawStaticWheel(); }
+      if (spinning || !items.length) return;
+      spinning = true; label.textContent = 'SPINNING...'; label.classList.remove('result');
+      const sd=4000, dd=3000, st=performance.now();
+      let lt=st, ca=0;
+      const ic=items.length, sg=(2*Math.PI)/ic, ti=Math.floor(Math.random()*ic), ch=items[ti];
+      let sa, td; const ex=3, v=Math.random()*0.005+0.005;
+      function reveal(box, labelElem, pokemon) {
+        labelElem.style.color='#2c2c2c'; labelElem.textContent=''; box.innerHTML='';
+        const img=pokemon.ballImage.cloneNode(); img.style.transition='transform 0.3s'; box.appendChild(img);
+        setTimeout(()=>{img.style.transform='rotate(-30deg)'; playPing();}, 500);
+        setTimeout(()=>{img.style.transform='rotate(30deg)'; playPing();}, 1000);
+        setTimeout(()=>{img.style.transform='rotate(-30deg)'; playPing();}, 1500);
+        setTimeout(()=>{img.style.transform='rotate(0deg)'; playTaDah();}, 2000);
+        setTimeout(()=>{ box.innerHTML=''; box.appendChild(pokemon.image.cloneNode()); labelElem.style.color='#fff'; labelElem.textContent=pokemon.name; }, 2500);
+      }
+      function frame(now) {
+        const e=now-st, dt=now-lt; lt=now;
+        if(e<sd) ca+=v*dt;
+        else if(e<sd+dd) {
+          if(sa===undefined) {
+            sa=ca; const des=-Math.PI/2-(ti*sg+sg/2);
+            let d=((des-sa)%(2*Math.PI)+2*Math.PI)%(2*Math.PI);
+            td=d+ex*2*Math.PI;
+          }
+          const t=(e-sd)/dd; ca=sa+td*(1-Math.pow(1-t,3));
+        } else {
+          ca=sa+td; pendingRemovalIdx=ti;
+          if(eliminationCount===0) reveal(box1,label1,ch);
+          else if(eliminationCount===1) reveal(box2,label2,ch);
+          eliminationCount++;
+          totalCount++;
+          counterEl.textContent = `Eliminated: ${totalCount}`;
+        }
+        drawWheel(ca); updateLabel(ca);
+        if(e<sd+dd) requestAnimationFrame(frame);
+        else { label.classList.add('result'); playTaDah(); spinning=false; lastIndex=-1; }
+      }
+      requestAnimationFrame(frame);
+    }
+    //container.addEventListener('click', startSpin);
+    startSpin();
+    const spinInterval = setInterval(() => {
+    if (items.length > 1) {
+        startSpin();
+        } else {
+        clearInterval(spinInterval);
+        }
+    }, 15000);
+    window.addEventListener('resize', setup);
+    setup();
+  </script>
+</body>
+</html>
