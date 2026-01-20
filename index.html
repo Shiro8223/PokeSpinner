@@ -5,33 +5,213 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Spin the Wheel</title>
   <style>
-    body, html { margin: 0; padding: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #2c2c2c; }
-    #wheel-container { position: relative; width: 50.5vmin; height: 50.5vmin; cursor: pointer; }
+    body, html { margin: 0; padding: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #141414; }
+
+    /* 9:16 capture frame (record this area) */
+    #capture-frame {
+      width: min(480px, 96vw);
+      aspect-ratio: 9 / 16;
+      max-height: 96vh;
+      background: #2c2c2c;
+      border: 3px solid rgba(255,255,255,0.22);
+      border-radius: 22px;
+      box-shadow: 0 18px 60px rgba(0,0,0,0.55);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    #capture-inner {
+      width: 100%;
+      height: 100%;
+      padding: 14px 12px 16px;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 10px;
+    }
+
+    #wheel-container { position: relative; width: 100%; max-width: 440px; aspect-ratio: 1 / 1; height: auto; cursor: pointer; }
     canvas { display: block; width: 100%; height: 100%; border-radius: 50%; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
+    #wheel-center { z-index: 2; }
     #ui-overlay { position: absolute; top: -100px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; pointer-events: none; }
     #contest-title {margin-top: 20px; background: rgb(38, 38, 219); color: yellow; padding: 0.3em 1em; border-radius: 1em; font-size: calc(1.5em + 8pt); font-weight: bolder; margin-bottom: 8px; white-space: nowrap; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
     #wheel-label { opacity: 0;background: rgba(0,0,0,0.7); color: #fff; padding: 0.5em 1em; border-radius: 1em; font-size: 1.2em; transition: font-size 0.3s ease; white-space: nowrap; text-shadow: 1px 1px 2px #000; margin-bottom: 6px; }
     #pointer { transform: translateY(-15px);width: 0; height: 0; border-left: 15px solid transparent; border-right: 15px solid transparent; border-top: 15px solid #ffeb3b; }
 
-    #elimination { display: flex; align-items: flex-start; justify-content: center; gap: 90px; margin-top: 30px; }
-    .box-container { display: flex; flex-direction: column; align-items: center; }
-    .box-label { color: #2c2c2c; font-size: calc(1em + 8pt); white-space: nowrap; margin-bottom: 8px; min-height: calc(1em + 8pt); }
-    .box { width: 180px; height: 180px; border: 3px solid #fff; background: #444; box-sizing: border-box; display: flex; align-items: center; justify-content: center; }
+    #elimination {
+      width: 100%;
+      box-sizing: border-box;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      gap: clamp(10px, 4vw, 28px);
+      margin-top: 6px;
+      padding: 0 4px;
+    }
+    .box-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      flex: 1 1 0;
+      min-width: 0;
+    }
+    .box-label {
+      color: #2c2c2c;
+      font-size: clamp(14px, 2.2vw, calc(1em + 6pt));
+      white-space: nowrap;
+      margin-bottom: 8px;
+      min-height: 1.4em;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      text-align: center;
+    }
+    .box {
+      width: 100%;
+      max-width: 180px;
+      height: auto;
+      aspect-ratio: 1 / 1;
+      border: 3px solid #fff;
+      background: #444;
+      box-sizing: border-box;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
     .box img { max-width: 100%; max-height: 100%; object-fit: contain; transform: scale(1.5); transform-origin: center center;}
-    .vs { color: #fff; font-size: calc(1.5em + 12pt); font-weight: bold; margin: 0; white-space: nowrap; padding-top: 90px;}
+    .vs { color: #fff; font-size: clamp(28px, 6vw, calc(1.3em + 12pt)); font-weight: bold; margin: 0; white-space: nowrap; align-self: center; padding-top: 0;}
   
     #elimination-counter { color: #fff; background-color: #e91e63; padding: 0.3em 1em; border-radius: 1em; font-size: calc(0.7em + 8pt); font-weight: bolder; margin-bottom: 8px; white-space: nowrap; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
     #comment-banner { color: #fff; background-color: rgb(91, 169, 91); padding: 0.3em 1em; border-radius: 1em; font-size: calc(1em + 8pt); font-weight: bolder; margin-bottom: 8px; white-space: nowrap; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
+
+    #controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px; margin-top: 12px; }
+    #controls button { cursor: pointer; border: 0; border-radius: 999px; padding: 10px 16px; font-weight: 800; background: #ffeb3b; color: #222; box-shadow: 0 2px 6px rgba(0,0,0,0.35); }
+    #controls button:disabled { opacity: 0.6; cursor: not-allowed; }
+    #controls label { color: #fff; font-weight: 700; user-select: none; }
+    #controls input[type="range"] { width: 180px; accent-color: #ffeb3b; }
+    #controls .range-value { display: inline-block; min-width: 3ch; text-align: right; font-variant-numeric: tabular-nums; }
+    #next-spin { color: #fff; background: rgba(0,0,0,0.5); padding: 8px 12px; border-radius: 999px; font-weight: 700; min-width: 170px; text-align: center; }
+
+    #export-elims { background: #66bb6a; }
+    #reset-elims { background: #ef5350; color: #0b1020; }
+
+    /* Simulator controls (outside the capture frame) */
+    #sim-controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(0,0,0,0.35);
+      max-width: min(860px, 96vw);
+    }
+    #sim-controls .sim-label { color: rgba(255,255,255,0.9); font-weight: 800; }
+    #sim-controls select {
+      appearance: none;
+      background: rgba(255,255,255,0.10);
+      border: 1px solid rgba(255,255,255,0.18);
+      color: #000;
+      border-radius: 12px;
+      padding: 10px 12px;
+      min-width: min(320px, 90vw);
+      font-weight: 700;
+      outline: none;
+    }
+    #sim-controls select option { color: #000; }
+    #sim-controls button {
+      cursor: pointer;
+      border: 0;
+      border-radius: 999px;
+      padding: 10px 16px;
+      font-weight: 900;
+      background: #29b6f6;
+      color: #0b1020;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+    }
+    #sim-controls button:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    /* Battle overlay (Phase 2) */
+    #battle-overlay {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 220ms ease;
+      display: grid;
+      place-items: center;
+      z-index: 10;
+    }
+    #battle-overlay.active { opacity: 1; }
+    #battle-surface {
+      width: 92%;
+      height: 92%;
+      border-radius: 18px;
+      background: rgba(0,0,0,0.55);
+      border: 2px solid rgba(255,255,255,0.25);
+      box-shadow: 0 18px 50px rgba(0,0,0,0.55);
+      position: relative;
+      overflow: hidden;
+    }
+    #battle-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      border-radius: 18px;
+      background: radial-gradient(circle at 30% 30%, #2f2f2f 0%, #1b1b1b 60%, #131313 100%);
+    }
+    #battle-hint {
+      position: absolute;
+      left: 12px;
+      right: 12px;
+      bottom: 10px;
+      text-align: center;
+      color: rgba(255,255,255,0.8);
+      font-weight: 800;
+      text-shadow: 0 2px 10px rgba(0,0,0,0.6);
+      pointer-events: none;
+    }
+
+    /* Phase 2: hide the wheel visuals (wheel becomes invisible) */
+    #wheel-container.battle-mode #wheel,
+    #wheel-container.battle-mode #wheel-center,
+    #wheel-container.battle-mode #ui-overlay {
+      opacity: 0;
+    }
+    #wheel-container.battle-mode #wheel { box-shadow: none; }
+
+    /* 9:16 friendly adjustments */
+    @media (max-aspect-ratio: 9/16) {
+      #capture-frame { width: 96vw; }
+      #wheel-container { max-width: 9999px; }
+      #elimination { margin-top: 6px; }
+    }
 
     
 
   </style>
 </head>
 <body>
+  <div id="capture-frame">
+    <div id="capture-inner">
+
   <div id="wheel-container">
     <canvas id="wheel"></canvas>
+
+    <div id="battle-overlay" aria-live="polite">
+      <div id="battle-surface">
+        <canvas id="battle-canvas"></canvas>
+        <div id="battle-hint">Pick two Pokémon to start a battle.</div>
+      </div>
+    </div>
     
-  <img
+  <img 
     id="wheel-center"
     src="images/masterball.png"
     alt=""
@@ -53,6 +233,7 @@
       <div id="pointer"></div>
     </div>
   </div>
+
   <div id="elimination">
     <div class="box-container">
       <div class="box-label" id="label1"></div>
@@ -67,6 +248,36 @@
   </div>
   <p id="elimination-counter">Eliminated: 0</p>
   <p id="comment-banner">Comment whos better!</p>
+
+    </div>
+  </div>
+
+  <div id="controls">
+    <button id="start-btn" disabled>Loading…</button>
+    <button id="pause-btn" disabled>Pause</button>
+    <button id="mute-btn">Mute</button>
+    <label><input id="auto-toggle" type="checkbox" checked> Auto-spin</label>
+    <label title="Limits how many Pokémon appear on the wheel">
+      Wheel size:
+      <span id="wheel-limit-value" class="range-value">--</span>
+      <input id="wheel-limit" type="range" min="2" max="2" step="1" value="2" disabled>
+    </label>
+    <span id="next-spin">Not started</span>
+    <button id="export-elims" disabled>Export Eliminations CSV</button>
+    <button id="reset-elims" disabled>Reset Eliminations</button>
+  </div>
+
+  <div id="sim-controls" aria-label="Battle simulator">
+    <span class="sim-label">Simulator:</span>
+    <select id="sim-a" disabled>
+      <option>Loading…</option>
+    </select>
+    <select id="sim-b" disabled>
+      <option>Loading…</option>
+    </select>
+    <button id="sim-start" disabled>Simulate Battle</button>
+  </div>
+
   <script>
     const container = document.getElementById('wheel-container');
     const canvas = document.getElementById('wheel');
@@ -78,38 +289,1612 @@
     const label2 = document.getElementById('label2');
     const counterEl = document.getElementById('elimination-counter');
 
+    const startBtn = document.getElementById('start-btn');
+    const pauseBtn = document.getElementById('pause-btn');
+    const muteBtn = document.getElementById('mute-btn');
+    const autoToggle = document.getElementById('auto-toggle');
+    const nextSpinEl = document.getElementById('next-spin');
+    const exportElimsBtn = document.getElementById('export-elims');
+    const resetElimsBtn = document.getElementById('reset-elims');
+
+    const wheelLimitEl = document.getElementById('wheel-limit');
+    const wheelLimitValueEl = document.getElementById('wheel-limit-value');
+
+    const simASelect = document.getElementById('sim-a');
+    const simBSelect = document.getElementById('sim-b');
+    const simStartBtn = document.getElementById('sim-start');
+
+    const battleOverlay = document.getElementById('battle-overlay');
+    const battleCanvas = document.getElementById('battle-canvas');
+    const battleCtx = battleCanvas.getContext('2d');
+    const battleHint = document.getElementById('battle-hint');
+
+    // Power-up sprite (drop a file into PokeSpin/images/ with this name)
+    const XATK_SPRITE_FILENAME = 'xatk.png';
+    const xAtkImg = new Image();
+    xAtkImg.src = `images/${XATK_SPRITE_FILENAME}`;
+
 
     class Pokemon {
-      constructor(id, name, ball, imageUrl) {
+      constructor(id, name, ball, imageUrl, type, stats) {
         this.id = id;
         this.name = name;
         this.ball = ball;
+        this.type = type || 'unknown';
+        this.stats = stats || { HP: 60, ATK: 60, DEF: 60, SPATK: 60, SPDEF: 60, SPD: 60 };
         this.image = new Image(); this.image.src = imageUrl;
         this.ballImage = new Image(); this.ballImage.src = `images/${ball.toLowerCase()}.png`;
       }
     }
 
-    let items = [], eliminationCount = 0, pendingRemovalIdx = null, totalCount = 0;
+    let items = [], allPokemon = [], eliminationCount = 0, totalCount = 0;
+
+    // Wheel view limiter (UI-only): the wheel can show a stable subset of the full pool.
+    const WHEEL_LIMIT_KEY = 'pokespin_wheel_limit_v1';
+    let wheelViewLimit = null; // number | null
+    let wheelView = []; // array of Pokemon used for drawing/spinning
+    let pendingWheelViewRefresh = false;
+
+    function shuffleCopy(arr) {
+      const a = arr.slice();
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+
+    function normalizedWheelLimit(raw) {
+      const max = Math.max(0, items.length);
+      if (max === 0) return 0;
+      const n = clamp(2, toInt(raw, max), max);
+      return n;
+    }
+
+    function syncWheelLimitUI() {
+      const max = Math.max(0, items.length);
+      if (max <= 0) {
+        wheelLimitEl.disabled = true;
+        wheelLimitEl.min = '2';
+        wheelLimitEl.max = '2';
+        wheelLimitEl.value = '2';
+        wheelLimitValueEl.textContent = '--';
+        return;
+      }
+
+      wheelLimitEl.disabled = false;
+      wheelLimitEl.min = String(Math.min(2, max));
+      wheelLimitEl.max = String(max);
+
+      const current = normalizedWheelLimit(wheelViewLimit ?? max);
+      wheelLimitEl.value = String(current);
+      wheelLimitValueEl.textContent = String(current);
+    }
+
+    function refreshWheelView({ force = false } = {}) {
+      const max = items.length;
+      if (!max) {
+        wheelView = [];
+        return;
+      }
+
+      const limit = normalizedWheelLimit(wheelViewLimit ?? max);
+      wheelViewLimit = limit;
+
+      // Keep subset stable unless forced or it no longer makes sense.
+      if (!force && wheelView.length === limit) {
+        const ids = new Set(items.map(p => p.id));
+        const stillValid = wheelView.every(p => ids.has(p.id));
+        if (stillValid) return;
+      }
+
+      if (limit >= max) {
+        wheelView = items.slice();
+      } else {
+        wheelView = shuffleCopy(items).slice(0, limit);
+      }
+    }
+
+    function redrawWheelNow() {
+      drawStaticWheel();
+      // Refresh wheel visuals without audio ping.
+      drawWheel(0, true);
+      updateLabel(0);
+    }
+
+    // Persisted eliminations log (survives refreshes)
+    const ELIMS_KEY = 'pokespin_eliminations_v1';
+    let eliminations = [];
+
+    function loadEliminations() {
+      try {
+        const raw = localStorage.getItem(ELIMS_KEY);
+        eliminations = raw ? (JSON.parse(raw) || []) : [];
+        if (!Array.isArray(eliminations)) eliminations = [];
+      } catch (_) {
+        eliminations = [];
+      }
+      totalCount = eliminations.length;
+      counterEl.textContent = `Eliminated: ${totalCount}`;
+    }
+
+    function saveEliminations() {
+      try { localStorage.setItem(ELIMS_KEY, JSON.stringify(eliminations)); } catch (_) {}
+      totalCount = eliminations.length;
+      counterEl.textContent = `Eliminated: ${totalCount}`;
+    }
+
+    function csvCell(v) {
+      const s = String(v ?? '');
+      // Quote if it contains commas, quotes, or newlines.
+      if (/[",\r\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+      return s;
+    }
+
+    function exportEliminationsCsv() {
+      const header = [
+        'match',
+        'eliminated_id',
+        'eliminated_name',
+        'eliminated_type',
+        'winner_id',
+        'winner_name',
+        'winner_type',
+        'timestamp',
+      ].join(',');
+
+      const rows = eliminations.map((e, i) => {
+        return [
+          i + 1,
+          e.eliminatedId,
+          csvCell(e.eliminatedName),
+          csvCell(e.eliminatedType),
+          e.winnerId,
+          csvCell(e.winnerName),
+          csvCell(e.winnerType),
+          csvCell(e.timestamp),
+        ].join(',');
+      });
+
+      const csv = [header, ...rows].join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'pokespin_eliminations.csv';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    function resetEliminations() {
+      const ok = confirm('Reset the saved eliminations list? This cannot be undone.');
+      if (!ok) return;
+      eliminations = [];
+      try { localStorage.removeItem(ELIMS_KEY); } catch (_) {}
+      saveEliminations();
+      setBanner('Eliminations reset.', '#ef5350');
+    }
     let size, center;
     const buffer = document.createElement('canvas');
     const bctx = buffer.getContext('2d');
+
+    // Battle selection state
+    let selectedA = null;
+    let selectedB = null;
+    let battleRunning = false;
+
+    function clamp(min, v, max) {
+      return Math.max(min, Math.min(max, v));
+    }
+
+    function toInt(v, fallback = 0) {
+      const n = Number.parseInt(String(v ?? ''), 10);
+      return Number.isFinite(n) ? n : fallback;
+    }
+
+    function getPokemonBattleStats(pokemon) {
+      const s = pokemon?.stats || {};
+      return {
+        HP: clamp(1, toInt(s.HP, 60), 255),
+        ATK: clamp(1, toInt(s.ATK, 60), 255),
+        DEF: clamp(1, toInt(s.DEF, 60), 255),
+        SPATK: clamp(1, toInt(s.SPATK, 60), 255),
+        SPDEF: clamp(1, toInt(s.SPDEF, 60), 255),
+        SPD: clamp(1, toInt(s.SPD, 60), 255),
+      };
+    }
+
+    function computeMaxHp(stats) {
+      // Tankiness comes from HP plus both defenses, but we cap extremes.
+      // Typical range lands ~140–320; very bulky mons capped.
+      const raw = (stats.HP * 2.0) + ((stats.DEF + stats.SPDEF) * 0.60);
+      return Math.round(clamp(80, raw, 420));
+    }
+
+    function computeCollisionDamage({ power, atk, def }) {
+      // Pokemon-like damage curve tuned for an arcade collision game.
+      // level and divisor chosen so fights usually end in ~6–12 collisions,
+      // while still letting strong attackers punch through.
+      const level = 35;
+      const levelFactor = (2 * level) / 5 + 2; // 16 at level 35
+      const divisor = 65;
+      const base = (((levelFactor * power * (atk / Math.max(1, def))) / divisor) + 2);
+      const variance = 0.90 + Math.random() * 0.20; // 0.90–1.10
+      return Math.max(1, Math.floor(base * variance));
+    }
+
+    // Type effectiveness chart (attacking type -> defender type -> multiplier)
+    // Covers the modern 18-type chart; values are 0, 0.5, 1, or 2.
+    const TYPE_CHART = {
+      normal:   { rock: 0.5, ghost: 0.0, steel: 0.5 },
+      fire:     { fire: 0.5, water: 0.5, grass: 2.0, ice: 2.0, bug: 2.0, rock: 0.5, dragon: 0.5, steel: 2.0 },
+      water:    { fire: 2.0, water: 0.5, grass: 0.5, ground: 2.0, rock: 2.0, dragon: 0.5 },
+      electric: { water: 2.0, electric: 0.5, grass: 0.5, ground: 0.0, flying: 2.0, dragon: 0.5 },
+      grass:    { fire: 0.5, water: 2.0, grass: 0.5, poison: 0.5, ground: 2.0, flying: 0.5, bug: 0.5, rock: 2.0, dragon: 0.5, steel: 0.5 },
+      ice:      { fire: 0.5, water: 0.5, grass: 2.0, ice: 0.5, ground: 2.0, flying: 2.0, dragon: 2.0, steel: 0.5 },
+      fighting: { normal: 2.0, ice: 2.0, rock: 2.0, dark: 2.0, steel: 2.0, poison: 0.5, flying: 0.5, psychic: 0.5, bug: 0.5, fairy: 0.5, ghost: 0.0 },
+      poison:   { grass: 2.0, fairy: 2.0, poison: 0.5, ground: 0.5, rock: 0.5, ghost: 0.5, steel: 0.0 },
+      ground:   { fire: 2.0, electric: 2.0, grass: 0.5, poison: 2.0, flying: 0.0, bug: 0.5, rock: 2.0, steel: 2.0 },
+      flying:   { electric: 0.5, grass: 2.0, fighting: 2.0, bug: 2.0, rock: 0.5, steel: 0.5 },
+      psychic:  { fighting: 2.0, poison: 2.0, psychic: 0.5, steel: 0.5, dark: 0.0 },
+      bug:      { fire: 0.5, grass: 2.0, fighting: 0.5, poison: 0.5, flying: 0.5, psychic: 2.0, ghost: 0.5, dark: 2.0, steel: 0.5, fairy: 0.5 },
+      rock:     { fire: 2.0, ice: 2.0, flying: 2.0, bug: 2.0, fighting: 0.5, ground: 0.5, steel: 0.5 },
+      ghost:    { normal: 0.0, psychic: 2.0, ghost: 2.0, dark: 0.5 },
+      dragon:   { dragon: 2.0, steel: 0.5, fairy: 0.0 },
+      dark:     { fighting: 0.5, psychic: 2.0, ghost: 2.0, dark: 0.5, fairy: 0.5 },
+      steel:    { fire: 0.5, water: 0.5, electric: 0.5, ice: 2.0, rock: 2.0, fairy: 2.0, steel: 0.5 },
+      fairy:    { fire: 0.5, fighting: 2.0, poison: 0.5, dragon: 2.0, dark: 2.0, steel: 0.5 },
+    };
+
+    // Type colors for the arena background (soft, readable).
+    const TYPE_COLORS = {
+      normal:   '#A8A77A',
+      fire:     '#EE8130',
+      water:    '#6390F0',
+      electric: '#F7D02C',
+      grass:    '#7AC74C',
+      ice:      '#96D9D6',
+      fighting: '#C22E28',
+      poison:   '#A33EA1',
+      ground:   '#E2BF65',
+      flying:   '#A98FF3',
+      psychic:  '#F95587',
+      bug:      '#A6B91A',
+      rock:     '#B6A136',
+      ghost:    '#735797',
+      dragon:   '#6F35FC',
+      dark:     '#705746',
+      steel:    '#B7B7CE',
+      fairy:    '#D685AD',
+      unknown:  '#6b6b6b',
+    };
+
+    function typeColor(type) {
+      const key = String(type || 'unknown').toLowerCase();
+      return TYPE_COLORS[key] || TYPE_COLORS.unknown;
+    }
+
+    function parseTypes(typeStr) {
+      if (!typeStr) return [];
+      return String(typeStr)
+        .toLowerCase()
+        .split('/')
+        .map(s => s.trim())
+        .filter(Boolean);
+    }
+
+    function typeMultiplier(attackType, defenderTypes) {
+      const atk = (attackType || '').toLowerCase();
+      const chart = TYPE_CHART[atk] || {};
+      let mult = 1.0;
+      for (const defType of defenderTypes) {
+        const m = chart[defType] ?? 1.0;
+        mult *= m;
+      }
+      // Keep things sane for the arcade feel.
+      // Note: true immunities (0x) can cause never-ending fights here, so we
+      // clamp to a small minimum.
+      return clamp(0.25, mult, 4);
+    }
+
+    function chooseAttackType(attackerTypes) {
+      if (!attackerTypes.length) return 'normal';
+      // Small variation: randomly pick one of the user's types.
+      return attackerTypes[Math.floor(Math.random() * attackerTypes.length)];
+    }
+
+    function setBanner(text, color = 'rgb(91, 169, 91)') {
+      const banner = document.getElementById('comment-banner');
+      banner.textContent = text;
+      banner.style.backgroundColor = color;
+    }
+
+    function setControlsDisabled(disabled) {
+      startBtn.disabled = disabled;
+      autoToggle.disabled = disabled;
+      pauseBtn.disabled = disabled || !autoToggle.checked;
+      container.style.pointerEvents = disabled ? 'none' : 'auto';
+      container.style.opacity = disabled ? '0.75' : '1';
+    }
+
+    function showBattleOverlay(show) {
+      battleOverlay.classList.toggle('active', !!show);
+      container.classList.toggle('battle-mode', !!show);
+    }
+
+    function resetSelectionBoxes() {
+      eliminationCount = 0;
+      selectedA = null;
+      selectedB = null;
+      box1.innerHTML = '';
+      label1.textContent = '';
+      box2.innerHTML = '';
+      label2.textContent = '';
+    }
+
+    function removePokemonById(id) {
+      const idx = items.findIndex(p => p.id === id);
+      if (idx >= 0) items.splice(idx, 1);
+      refreshWheelView({ force: true });
+      redrawWheelNow();
+    }
+
+    function addPokemonIfMissing(pokemon) {
+      if (!pokemon) return;
+      if (items.some(p => p.id === pokemon.id)) return;
+      items.push(pokemon);
+      refreshWheelView({ force: true });
+      redrawWheelNow();
+    }
+
+    function getPokemonById(id) {
+      const numId = Number(id);
+      return allPokemon.find(p => p.id === numId) || items.find(p => p.id === numId) || null;
+    }
+
+    function setSelectionBox(box, labelElem, pokemon) {
+      if (!pokemon) return;
+      labelElem.style.color = '#fff';
+      labelElem.textContent = pokemon.name;
+      box.innerHTML = '';
+      box.appendChild(pokemon.image.cloneNode());
+    }
+
+    function populateSimSelectors() {
+      const sorted = [...allPokemon].sort((a, b) => a.id - b.id);
+
+      const makeOpt = (p) => {
+        const opt = document.createElement('option');
+        opt.value = String(p.id);
+        const num = String(p.id).padStart(4, '0');
+        const t = (p.type && p.type !== 'unknown') ? ` [${p.type}]` : '';
+        opt.textContent = `${num} ${p.name}${t}`;
+        return opt;
+      };
+
+      simASelect.innerHTML = '';
+      simBSelect.innerHTML = '';
+      for (const p of sorted) {
+        simASelect.appendChild(makeOpt(p));
+        simBSelect.appendChild(makeOpt(p));
+      }
+
+      // Sensible defaults
+      if (sorted.length) simASelect.value = String(sorted[0].id);
+      if (sorted.length > 1) simBSelect.value = String(sorted[1].id);
+
+      simASelect.disabled = false;
+      simBSelect.disabled = false;
+      simStartBtn.disabled = false;
+    }
+
+    async function startBattle(pokeA, pokeB, { affectWheelPool = true, preserveSpinState = false } = {}) {
+      if (!pokeA || !pokeB) return;
+      if (battleRunning) return;
+
+      const prevPaused = paused;
+
+      battleRunning = true;
+      showBattleOverlay(true);
+      setControlsDisabled(true);
+
+      // Avoid background spins during battle.
+      stopAutoSpin();
+      if (!preserveSpinState) {
+        paused = true;
+        pauseBtn.textContent = 'Resume';
+      }
+
+      battleHint.textContent = 'Battle started!';
+      setBanner('Battle!', '#ff6f00');
+
+      const playEliminationAnimation = (winnerF, loserF, done) => {
+        // Keep overlay visible; do a quick, faint "KO" animation.
+        const start = performance.now();
+        const duration = 900;
+        const dpr = window.devicePixelRatio || 1;
+        const pad = 14 * dpr;
+
+        const fxCanvas = document.createElement('canvas');
+        const fxCtx = fxCanvas.getContext('2d');
+
+        const w = battleCanvas.width;
+        const h = battleCanvas.height;
+
+        const drawSprite = (f, alpha = 1, scale = 1, tintAlpha = 0) => {
+          const size = f.r * 2.2 * scale;
+          const dx = f.x - size / 2;
+          const dy = f.y - size / 2;
+          battleCtx.save();
+          battleCtx.globalAlpha = alpha;
+          if (f.img && f.img.complete) {
+            if (tintAlpha > 0) {
+              const sw = Math.max(1, Math.floor(size));
+              const sh = Math.max(1, Math.floor(size));
+              if (fxCanvas.width !== sw || fxCanvas.height !== sh) {
+                fxCanvas.width = sw;
+                fxCanvas.height = sh;
+              }
+              fxCtx.clearRect(0, 0, sw, sh);
+              fxCtx.globalCompositeOperation = 'source-over';
+              fxCtx.globalAlpha = 1;
+              fxCtx.drawImage(f.img, 0, 0, sw, sh);
+              fxCtx.globalCompositeOperation = 'source-atop';
+              fxCtx.fillStyle = `rgba(255, 40, 40, ${tintAlpha})`;
+              fxCtx.fillRect(0, 0, sw, sh);
+              fxCtx.globalCompositeOperation = 'source-over';
+
+              battleCtx.drawImage(fxCanvas, dx, dy, size, size);
+            } else {
+              battleCtx.drawImage(f.img, dx, dy, size, size);
+            }
+          } else {
+            battleCtx.fillStyle = (tintAlpha > 0) ? `rgba(255, 60, 60, ${Math.min(0.9, 0.35 + tintAlpha)})` : 'rgba(255,255,255,0.85)';
+            battleCtx.beginPath();
+            battleCtx.arc(f.x, f.y, f.r * scale, 0, Math.PI * 2);
+            battleCtx.fill();
+          }
+          battleCtx.restore();
+        };
+
+        const tick = (ts) => {
+          const t = clamp(0, (ts - start) / duration, 1);
+          resizeBattleCanvas();
+
+          const cw = battleCanvas.width;
+          const ch = battleCanvas.height;
+
+          // Background
+          battleCtx.clearRect(0, 0, cw, ch);
+          battleCtx.save();
+          battleCtx.strokeStyle = 'rgba(255,255,255,0.22)';
+          battleCtx.lineWidth = 6 * dpr;
+          battleCtx.strokeRect(pad, pad, cw - pad * 2, ch - pad * 2);
+          battleCtx.restore();
+
+          // Winner stays, loser fades + shrinks + slight drop.
+          drawSprite(winnerF, 1, 1);
+          const fade = 1 - t;
+          const scale = 1 - (0.25 * t);
+          const loserAnim = { ...loserF, y: loserF.y + (18 * dpr * t) };
+          drawSprite(loserAnim, fade * 0.9, scale, 0.22 * fade);
+
+          // Text
+          battleCtx.save();
+          battleCtx.font = `${Math.floor(18 * dpr)}px system-ui, -apple-system, Segoe UI, Arial`;
+          battleCtx.fillStyle = 'rgba(255,255,255,0.9)';
+          battleCtx.textAlign = 'center';
+          battleCtx.textBaseline = 'top';
+          battleCtx.fillText(`${loserF.name} was eliminated!`, cw / 2, pad + Math.floor(8 * dpr));
+          battleCtx.restore();
+
+          if (t < 1) {
+            requestAnimationFrame(tick);
+          } else {
+            done?.();
+          }
+        };
+
+        requestAnimationFrame(tick);
+      };
+
+      await arena.start(pokeA, pokeB, (winner, loser) => {
+        battleRunning = false;
+
+        // KO sound
+        playKoSfx();
+
+        if (affectWheelPool) {
+          // Record elimination (loser) for persistence.
+          eliminations.push({
+            eliminatedId: loser.poke?.id ?? '',
+            eliminatedName: loser.name ?? '',
+            eliminatedType: loser.poke?.type ?? loser.type ?? '',
+            winnerId: winner.poke?.id ?? '',
+            winnerName: winner.name ?? '',
+            winnerType: winner.poke?.type ?? winner.type ?? '',
+            timestamp: new Date().toISOString(),
+          });
+          saveEliminations();
+
+          // Winner goes back into the wheel pool (both fighters were removed on selection).
+          addPokemonIfMissing(winner.poke);
+        }
+
+        const finishUp = () => {
+          showBattleOverlay(false);
+
+          if (items.length <= 1 && affectWheelPool) {
+            setBanner(`Champion: ${winner.name}!`, '#7b61ff');
+            battleHint.textContent = `Champion: ${winner.name}`;
+            setControlsDisabled(true);
+            drawBattleIdle();
+            return;
+          }
+
+          setBanner(`Winner: ${winner.name}!`, '#1e88e5');
+          battleHint.textContent = `Winner: ${winner.name}. ${affectWheelPool ? 'Continuing…' : 'Run another sim anytime.'}`;
+          drawBattleIdle();
+
+          if (affectWheelPool) {
+            resetSelectionBoxes();
+          }
+
+          setControlsDisabled(false);
+
+          if (preserveSpinState) {
+            paused = prevPaused;
+          } else {
+            // Tournament mode: keep the show rolling after the KO animation.
+            paused = false;
+          }
+          pauseBtn.textContent = paused ? 'Resume' : 'Pause';
+
+          if (started && autoToggle.checked && !paused) startAutoSpin();
+          else stopAutoSpin();
+
+          updateCountdown();
+        };
+
+        // Run a short KO animation before returning to the wheel.
+        playEliminationAnimation(winner, loser, finishUp);
+      });
+    }
+
+    function pickRandomIndex(excludeId = null) {
+      if (items.length === 0) return -1;
+      if (excludeId === null) return Math.floor(Math.random() * items.length);
+      const candidates = [];
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].id !== excludeId) candidates.push(i);
+      }
+      if (!candidates.length) return -1;
+      return candidates[Math.floor(Math.random() * candidates.length)];
+    }
+
+    function pickRandomWheelIndex(excludeId = null) {
+      const count = wheelView.length;
+      if (count === 0) return -1;
+      if (excludeId === null) return Math.floor(Math.random() * count);
+      const candidates = [];
+      for (let i = 0; i < count; i++) {
+        if (wheelView[i]?.id !== excludeId) candidates.push(i);
+      }
+      if (!candidates.length) return -1;
+      return candidates[Math.floor(Math.random() * candidates.length)];
+    }
+
+    // Stats are now loaded from pokeLIST.csv (TYPE + base stats). No network fetch needed.
+
+    function resizeBattleCanvas() {
+      const dpr = window.devicePixelRatio || 1;
+      const rect = battleCanvas.getBoundingClientRect();
+      const w = Math.max(1, Math.floor(rect.width * dpr));
+      const h = Math.max(1, Math.floor(rect.height * dpr));
+      if (battleCanvas.width !== w || battleCanvas.height !== h) {
+        battleCanvas.width = w;
+        battleCanvas.height = h;
+      }
+    }
+
+    function drawBattleIdle() {
+      resizeBattleCanvas();
+      const w = battleCanvas.width;
+      const h = battleCanvas.height;
+      battleCtx.clearRect(0, 0, w, h);
+      battleCtx.save();
+      battleCtx.strokeStyle = 'rgba(255,255,255,0.25)';
+      battleCtx.lineWidth = 6;
+      battleCtx.strokeRect(12, 12, w - 24, h - 24);
+      battleCtx.fillStyle = 'rgba(255,255,255,0.9)';
+      battleCtx.font = `${Math.floor(18 * (window.devicePixelRatio || 1))}px system-ui, -apple-system, Segoe UI, Arial`;
+      battleCtx.textAlign = 'center';
+      battleCtx.textBaseline = 'middle';
+      const msg = battleRunning ? 'Battle in progress…' : 'Waiting for two Pokémon…';
+      battleCtx.fillText(msg, w / 2, h / 2);
+      battleCtx.restore();
+    }
+
+    class BattleArena {
+      constructor(ctx, canvas) {
+        this.ctx = ctx;
+        this.canvas = canvas;
+        this.fxCanvas = document.createElement('canvas');
+        this.fxCtx = this.fxCanvas.getContext('2d');
+        this.rafId = null;
+        this.running = false;
+        this.lastTs = 0;
+        this.battleStartAt = 0;
+        this.lastHitAt = 0;
+        this.hitCooldownMs = 220;
+        this.hitCount = 0;
+        this.minHitsToEnd = 0;
+        this.invulnMs = 1500;
+        this.hitFlashMs = 1000;
+        this.powerUpDelayMs = 7000;
+        this.powerUp = null;
+        this.nextPowerUpAt = 0;
+        this.eventText = '';
+        this.eventUntil = 0;
+        this.arenaTypes = [];
+        this.onEnd = null;
+        this.a = null;
+        this.b = null;
+      }
+
+      stop() {
+        this.running = false;
+        if (this.rafId !== null) cancelAnimationFrame(this.rafId);
+        this.rafId = null;
+      }
+
+      async start(pokeA, pokeB, onEnd) {
+        this.stop();
+        this.onEnd = onEnd;
+        this.running = true;
+        this.lastTs = performance.now();
+        this.battleStartAt = this.lastTs;
+        this.lastHitAt = 0;
+        this.hitCount = 0;
+        this.powerUp = null;
+        this.nextPowerUpAt = this.battleStartAt + this.powerUpDelayMs;
+        this.eventText = '';
+        this.eventUntil = 0;
+
+        // Arena background types: unique types among both Pokémon (up to 4).
+        const uniq = new Set([
+          ...parseTypes(pokeA?.type),
+          ...parseTypes(pokeB?.type),
+        ]);
+        const ordered = Array.from(uniq)
+          .map(t => String(t).toLowerCase())
+          .filter(Boolean)
+          .slice(0, 4);
+        this.arenaTypes = ordered.length ? ordered : ['unknown'];
+
+        resizeBattleCanvas();
+        const w = this.canvas.width;
+        const h = this.canvas.height;
+        const pad = 18 * (window.devicePixelRatio || 1);
+
+        const statsA = getPokemonBattleStats(pokeA);
+        const statsB = getPokemonBattleStats(pokeB);
+
+        try { await pokeA.image.decode(); } catch (_) {}
+        try { await pokeB.image.decode(); } catch (_) {}
+
+        const baseRadius = Math.min(w, h) * 0.09;
+        // Speed affects movement, but we clamp to keep physics playable.
+        const spdA = clamp(35, statsA.SPD, 140);
+        const spdB = clamp(35, statsB.SPD, 140);
+
+        const speedScale = 0.0045; // tuned for px/ms at typical dpr
+        const randDir = () => {
+          const a = Math.random() * Math.PI * 2;
+          return { x: Math.cos(a), y: Math.sin(a) };
+        };
+
+        const dirA = randDir();
+        const dirB = randDir();
+
+        this.a = {
+          poke: pokeA,
+          name: pokeA.name,
+          img: pokeA.image,
+          x: pad + baseRadius + (w * 0.25),
+          y: pad + baseRadius + (h * 0.5),
+          vx: dirA.x * spdA * speedScale,
+          vy: dirA.y * spdA * speedScale,
+          r: baseRadius,
+          type: pokeA.type,
+          stats: statsA,
+          maxHp: computeMaxHp(statsA),
+          hp: computeMaxHp(statsA),
+          invulnUntil: 0,
+          noAttackUntil: 0,
+          flashUntil: 0,
+        };
+        this.b = {
+          poke: pokeB,
+          name: pokeB.name,
+          img: pokeB.image,
+          x: w - (pad + baseRadius + (w * 0.25)),
+          y: pad + baseRadius + (h * 0.5),
+          vx: dirB.x * spdB * speedScale,
+          vy: dirB.y * spdB * speedScale,
+          r: baseRadius,
+          type: pokeB.type,
+          stats: statsB,
+          maxHp: computeMaxHp(statsB),
+          hp: computeMaxHp(statsB),
+          invulnUntil: 0,
+          noAttackUntil: 0,
+          flashUntil: 0,
+        };
+
+        const tick = (ts) => {
+          if (!this.running) return;
+          const dt = Math.min(34, Math.max(0, ts - this.lastTs));
+          this.lastTs = ts;
+          this.step(dt);
+          this.draw();
+          this.rafId = requestAnimationFrame(tick);
+        };
+        this.rafId = requestAnimationFrame(tick);
+      }
+
+      arenaTypeAtPoint(x, y) {
+        if (!this.arenaTypes || !this.arenaTypes.length) return 'unknown';
+        const dpr = window.devicePixelRatio || 1;
+        const pad = 14 * dpr;
+        const w = this.canvas.width;
+        const h = this.canvas.height;
+        const innerW = Math.max(1, w - pad * 2);
+        const innerH = Math.max(1, h - pad * 2);
+        const n = this.arenaTypes.length;
+
+        // Match the draw() layout:
+        // 1: full, 2: 50/50 vertical, 3: triangle thirds, 4: quadrant quarters.
+        const cx = pad + innerW / 2;
+        const cy = pad + innerH / 2;
+
+        if (n <= 1) return this.arenaTypes[0] || 'unknown';
+        if (n === 2) return (x < cx) ? (this.arenaTypes[0] || 'unknown') : (this.arenaTypes[1] || 'unknown');
+        if (n === 3) {
+          if (x < cx) return this.arenaTypes[0] || 'unknown';
+          return (y < cy) ? (this.arenaTypes[1] || 'unknown') : (this.arenaTypes[2] || 'unknown');
+        }
+        // n >= 4
+        const left = x < cx;
+        const top = y < cy;
+        if (left && top) return this.arenaTypes[0] || 'unknown';
+        if (!left && top) return this.arenaTypes[1] || 'unknown';
+        if (left && !top) return this.arenaTypes[2] || 'unknown';
+        return this.arenaTypes[3] || 'unknown';
+      }
+
+      showEvent(text, ms = 1400) {
+        this.eventText = String(text || '');
+        this.eventUntil = performance.now() + ms;
+      }
+
+      spawnPowerUp() {
+        const dpr = window.devicePixelRatio || 1;
+        const w = this.canvas.width;
+        const h = this.canvas.height;
+        const pad = 18 * dpr;
+        const r = 14 * dpr;
+
+        const minX = pad + r;
+        const maxX = w - pad - r;
+        const minY = pad + r;
+        const maxY = h - pad - r;
+
+        const tryCount = 20;
+        let x = (minX + maxX) / 2;
+        let y = (minY + maxY) / 2;
+        for (let i = 0; i < tryCount; i++) {
+          const tx = minX + Math.random() * Math.max(1, (maxX - minX));
+          const ty = minY + Math.random() * Math.max(1, (maxY - minY));
+          const da = Math.hypot(tx - this.a.x, ty - this.a.y);
+          const db = Math.hypot(tx - this.b.x, ty - this.b.y);
+          if (da > (this.a.r + r + 10 * dpr) && db > (this.b.r + r + 10 * dpr)) {
+            x = tx;
+            y = ty;
+            break;
+          }
+        }
+
+        this.powerUp = { x, y, r, spawnedAt: performance.now() };
+        this.showEvent('A power-up appeared!', 1200);
+      }
+
+      maybeSpawnPowerUp(now) {
+        if (this.powerUp) return;
+        if (now < this.nextPowerUpAt) return;
+        this.spawnPowerUp();
+        // Schedule the next one regardless of whether this one gets taken.
+        this.nextPowerUpAt = now + this.powerUpDelayMs;
+      }
+
+      checkPowerUpPickup(now) {
+        if (!this.powerUp) return;
+        const p = this.powerUp;
+
+        const touch = (fighter) => {
+          const d = Math.hypot(fighter.x - p.x, fighter.y - p.y);
+          return d <= (fighter.r + p.r);
+        };
+
+        let winner = null;
+        if (touch(this.a)) winner = this.a;
+        else if (touch(this.b)) winner = this.b;
+        if (!winner) return;
+
+        // Apply ATK boost (arcade-friendly).
+        const boost = 1.35;
+        winner.stats.ATK = Math.round(winner.stats.ATK * boost);
+        winner.stats.ATK = clamp(1, winner.stats.ATK, 999);
+
+        this.powerUp = null;
+        // Next spawn is already scheduled; keep the cadence.
+        playPowerUpSfx();
+        this.showEvent(`${winner.name} got an ATK boost!`, 1600);
+      }
+
+      step(dt) {
+        resizeBattleCanvas();
+        const w = this.canvas.width;
+        const h = this.canvas.height;
+        const dpr = window.devicePixelRatio || 1;
+        const pad = 14 * dpr;
+
+        const now = performance.now();
+        this.maybeSpawnPowerUp(now);
+        this.checkPowerUpPickup(now);
+
+        const advance = (f) => {
+          f.x += f.vx * dt;
+          f.y += f.vy * dt;
+
+          // Wall collisions
+          if (f.x - f.r < pad) { f.x = pad + f.r; f.vx *= -1; }
+          if (f.x + f.r > w - pad) { f.x = (w - pad) - f.r; f.vx *= -1; }
+          if (f.y - f.r < pad) { f.y = pad + f.r; f.vy *= -1; }
+          if (f.y + f.r > h - pad) { f.y = (h - pad) - f.r; f.vy *= -1; }
+
+          // Keep energy (arcade feel). If you want slight stabilization, use 0.99995.
+          // f.vx *= 0.99995;
+          // f.vy *= 0.99995;
+        };
+
+        advance(this.a);
+        advance(this.b);
+
+        // Circle-circle collision
+        const dx = this.b.x - this.a.x;
+        const dy = this.b.y - this.a.y;
+        const dist = Math.hypot(dx, dy);
+        const minDist = this.a.r + this.b.r;
+        if (dist > 0 && dist < minDist) {
+          const nx = dx / dist;
+          const ny = dy / dist;
+
+          // Separate overlap
+          const overlap = (minDist - dist);
+          this.a.x -= nx * overlap * 0.5;
+          this.a.y -= ny * overlap * 0.5;
+          this.b.x += nx * overlap * 0.5;
+          this.b.y += ny * overlap * 0.5;
+
+          // Apply damage BEFORE we resolve the bounce impulse.
+          // (After the impulse, velocities can flip, which makes "who hit who" feel wrong.)
+          const now = performance.now();
+          if (now - this.lastHitAt >= this.hitCooldownMs) {
+            this.lastHitAt = now;
+            this.applyCollisionDamage(dx, dy, now);
+          }
+
+          // Relative velocity along normal
+          const rvx = this.b.vx - this.a.vx;
+          const rvy = this.b.vy - this.a.vy;
+          const velAlongNormal = rvx * nx + rvy * ny;
+
+          if (velAlongNormal < 0) {
+            const restitution = 0.99;
+            const j = -(1 + restitution) * velAlongNormal / 2; // masses = 1
+            const ix = j * nx;
+            const iy = j * ny;
+            this.a.vx -= ix;
+            this.a.vy -= iy;
+            this.b.vx += ix;
+            this.b.vy += iy;
+          }
+        }
+
+        // End condition
+        if (this.a.hp <= 0 || this.b.hp <= 0) {
+          const winner = (this.a.hp > 0) ? this.a : this.b;
+          const loser = (this.a.hp > 0) ? this.b : this.a;
+          this.stop();
+          if (typeof this.onEnd === 'function') this.onEnd(winner, loser);
+        }
+      }
+
+      applyCollisionDamage(dx, dy, now = performance.now()) {
+        const dist = Math.max(1, Math.hypot(dx, dy));
+        const nx = dx / dist;
+        const ny = dy / dist;
+        const vaN = (this.a.vx * nx + this.a.vy * ny);
+        const vbN = (this.b.vx * nx + this.b.vy * ny);
+        // Impact contributions toward each other along the collision normal.
+        const aTowardB = Math.max(0, vaN);
+        const bTowardA = Math.max(0, -vbN);
+        const relSpeed = aTowardB + bTowardA;
+
+        // Convert collision speed into a move-like "power".
+        // With current velocity scaling, relSpeed is usually ~0.2–0.8.
+        const power = clamp(18, relSpeed * 180, 120);
+
+        // Collision point (used for arena type bonus)
+        const cx = (this.a.x + this.b.x) * 0.5;
+        const cy = (this.a.y + this.b.y) * 0.5;
+
+        // Decide who is the "attacker" this collision (who delivered more of the impact).
+        // This enables: (1) red glow on the one that got hit, (2) invulnerability,
+        // (3) "can't hit back" during invulnerability.
+        let attacker = this.a;
+        let defender = this.b;
+        if (bTowardA > aTowardB) {
+          attacker = this.b;
+          defender = this.a;
+        }
+
+        // If attacker is stunned, they can't deal damage.
+        if (attacker.noAttackUntil && now < attacker.noAttackUntil) return false;
+
+        // If defender is invulnerable, ignore this hit.
+        if (defender.invulnUntil && now < defender.invulnUntil) return false;
+
+        // Use stronger attacking stat.
+        const atkIsSpecial = attacker.stats.SPATK > attacker.stats.ATK;
+
+        const atkTypes = parseTypes(attacker.type);
+        const defTypes = parseTypes(defender.type);
+        const atkType = chooseAttackType(atkTypes);
+        const stab = atkTypes.includes(atkType) ? 1.2 : 1.0;
+        const eff = typeMultiplier(atkType, defTypes);
+
+        // Arena bonus: if the attack type matches the background band where the
+        // collision happens, give a 10% bonus.
+        const zoneType = this.arenaTypeAtPoint(cx, cy);
+        const arenaBonus = (String(atkType).toLowerCase() === String(zoneType).toLowerCase()) ? 1.10 : 1.0;
+
+        const dmg = Math.max(1, Math.floor(computeCollisionDamage({
+          power,
+          atk: atkIsSpecial ? attacker.stats.SPATK : attacker.stats.ATK,
+          def: atkIsSpecial ? defender.stats.SPDEF : defender.stats.DEF,
+        }) * stab * eff * arenaBonus));
+
+        // Hit SFX (scale by collision power)
+        playHitImpact(clamp(0.2, (power - 18) / (120 - 18), 1));
+
+        // Apply damage + status.
+        defender.hp = Math.max(0, defender.hp - dmg);
+        defender.invulnUntil = now + this.invulnMs;
+        defender.noAttackUntil = now + this.invulnMs;
+        defender.flashUntil = now + this.hitFlashMs;
+
+        // Count only actual damaging hits.
+        this.hitCount++;
+
+        // Small feedback for viewers.
+        if (typeof battleHint !== 'undefined') {
+          let tag = '';
+          if (eff >= 2) tag = ' (super effective)';
+          else if (eff < 1) tag = ' (not very effective)';
+          const zoneTag = (arenaBonus > 1) ? ` (+arena ${zoneType})` : '';
+          battleHint.textContent = `${attacker.name} hit ${defender.name} with ${atkType}${tag}${zoneTag}`;
+        }
+
+        return true;
+
+      }
+
+      drawHpBar(x, y, w, h, frac, color) {
+        const ctx = this.ctx;
+        ctx.save();
+        ctx.fillStyle = 'rgba(0,0,0,0.45)';
+        ctx.fillRect(x, y, w, h);
+        ctx.fillStyle = 'rgba(255,255,255,0.22)';
+        ctx.fillRect(x + 2, y + 2, w - 4, h - 4);
+        ctx.fillStyle = color;
+        ctx.fillRect(x + 2, y + 2, Math.max(0, (w - 4) * frac), h - 4);
+        ctx.restore();
+      }
+
+      hpColor(frac) {
+        const f = clamp(0, frac, 1);
+        if (f <= 0.2) return '#e53935';  // red
+        if (f <= 0.5) return '#fdd835';  // yellow
+        return '#43a047';                // green
+      }
+
+      draw() {
+        const ctx = this.ctx;
+        const w = this.canvas.width;
+        const h = this.canvas.height;
+        const dpr = window.devicePixelRatio || 1;
+        const pad = 14 * dpr;
+
+        const now = performance.now();
+
+        ctx.clearRect(0, 0, w, h);
+
+        // Arena background split by unique types (1–4):
+        // 1: full, 2: 50/50 vertical, 3: triangle thirds, 4: quadrant quarters.
+        const nTypes = (this.arenaTypes && this.arenaTypes.length) ? this.arenaTypes.length : 1;
+        const innerX = pad;
+        const innerY = pad;
+        const innerW = w - pad * 2;
+        const innerH = h - pad * 2;
+        if (innerW > 0 && innerH > 0) {
+          const cx = innerX + innerW / 2;
+          const cy = innerY + innerH / 2;
+
+          const fillShape = (typeName, drawPath) => {
+            ctx.save();
+            ctx.globalAlpha = 0.16;
+            ctx.fillStyle = typeColor(typeName);
+            ctx.beginPath();
+            drawPath();
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+          };
+
+          if (nTypes <= 1) {
+            fillShape(this.arenaTypes[0] || 'unknown', () => {
+              ctx.rect(innerX, innerY, innerW, innerH);
+            });
+          } else if (nTypes === 2) {
+            fillShape(this.arenaTypes[0] || 'unknown', () => {
+              ctx.rect(innerX, innerY, innerW / 2, innerH);
+            });
+            fillShape(this.arenaTypes[1] || 'unknown', () => {
+              ctx.rect(cx, innerY, innerW / 2, innerH);
+            });
+          } else if (nTypes === 3) {
+            // Triangular thirds (left triangle + top-right + bottom-right)
+            fillShape(this.arenaTypes[0] || 'unknown', () => {
+              ctx.moveTo(innerX, innerY);
+              ctx.lineTo(innerX, innerY + innerH);
+              ctx.lineTo(cx, cy);
+            });
+            fillShape(this.arenaTypes[1] || 'unknown', () => {
+              ctx.moveTo(innerX, innerY);
+              ctx.lineTo(innerX + innerW, innerY);
+              ctx.lineTo(cx, cy);
+            });
+            fillShape(this.arenaTypes[2] || 'unknown', () => {
+              ctx.moveTo(innerX + innerW, innerY);
+              ctx.lineTo(innerX + innerW, innerY + innerH);
+              ctx.lineTo(cx, cy);
+            });
+          } else {
+            // Square quarters
+            fillShape(this.arenaTypes[0] || 'unknown', () => {
+              ctx.rect(innerX, innerY, innerW / 2, innerH / 2);
+            });
+            fillShape(this.arenaTypes[1] || 'unknown', () => {
+              ctx.rect(cx, innerY, innerW / 2, innerH / 2);
+            });
+            fillShape(this.arenaTypes[2] || 'unknown', () => {
+              ctx.rect(innerX, cy, innerW / 2, innerH / 2);
+            });
+            fillShape(this.arenaTypes[3] || 'unknown', () => {
+              ctx.rect(cx, cy, innerW / 2, innerH / 2);
+            });
+          }
+
+          // subtle overlay to keep contrast nice
+          ctx.save();
+          ctx.globalAlpha = 0.25;
+          ctx.fillStyle = 'rgba(0,0,0,0.25)';
+          ctx.fillRect(innerX, innerY, innerW, innerH);
+          ctx.restore();
+        }
+
+        // Arena border
+        ctx.save();
+        ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+        ctx.lineWidth = 6 * dpr;
+        ctx.strokeRect(pad, pad, w - pad * 2, h - pad * 2);
+        ctx.restore();
+
+        // Power-up (draw behind sprites)
+        if (this.powerUp) {
+          const p = this.powerUp;
+          const pulse = 1 + 0.08 * Math.sin((now - p.spawnedAt) * 0.012);
+
+          // Prefer sprite; fall back to the old glow circle if the image isn't available.
+          if (xAtkImg && xAtkImg.complete && xAtkImg.naturalWidth > 0) {
+            const size = (p.r * 2.6) * pulse;
+            const dx = p.x - size / 2;
+            const dy = p.y - size / 2;
+
+            ctx.save();
+            // subtle glow behind sprite
+            const rr = p.r * 1.5 * pulse;
+            const grad = ctx.createRadialGradient(p.x, p.y, 1, p.x, p.y, rr);
+            grad.addColorStop(0, 'rgba(120, 220, 255, 0.45)');
+            grad.addColorStop(1, 'rgba(120, 220, 255, 0.0)');
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, rr, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.globalAlpha = 0.92;
+            ctx.drawImage(xAtkImg, dx, dy, size, size);
+            ctx.restore();
+          } else {
+            const rr = p.r * pulse;
+            ctx.save();
+            const grad = ctx.createRadialGradient(p.x, p.y, 1, p.x, p.y, rr);
+            grad.addColorStop(0, 'rgba(120, 220, 255, 0.55)');
+            grad.addColorStop(0.6, 'rgba(120, 220, 255, 0.22)');
+            grad.addColorStop(1, 'rgba(120, 220, 255, 0.0)');
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, rr, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(120, 220, 255, 0.65)';
+            ctx.lineWidth = 3 * dpr;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+          }
+        }
+
+        const drawFighter = (f) => {
+          const size = f.r * 2.2;
+          if (f.img && f.img.complete) {
+            const dx = f.x - size / 2;
+            const dy = f.y - size / 2;
+            const hit = (f.flashUntil && now < f.flashUntil);
+            if (!hit) {
+              ctx.drawImage(f.img, dx, dy, size, size);
+            } else {
+              const t = clamp(0, (f.flashUntil - now) / Math.max(1, this.hitFlashMs), 1);
+              const alpha = 0.55 * t;
+
+              const sw = Math.max(1, Math.floor(size));
+              const sh = Math.max(1, Math.floor(size));
+              if (this.fxCanvas.width !== sw || this.fxCanvas.height !== sh) {
+                this.fxCanvas.width = sw;
+                this.fxCanvas.height = sh;
+              }
+
+              const fx = this.fxCtx;
+              fx.clearRect(0, 0, sw, sh);
+              fx.globalAlpha = 1;
+              fx.globalCompositeOperation = 'source-over';
+              fx.drawImage(f.img, 0, 0, sw, sh);
+              fx.globalCompositeOperation = 'source-atop';
+              fx.fillStyle = `rgba(255, 0, 0, ${alpha})`;
+              fx.fillRect(0, 0, sw, sh);
+              fx.globalCompositeOperation = 'source-over';
+
+              ctx.drawImage(this.fxCanvas, dx, dy, size, size);
+            }
+          } else {
+            ctx.save();
+            const hit = (f.flashUntil && now < f.flashUntil);
+            ctx.fillStyle = hit ? 'rgba(255, 60, 60, 0.9)' : 'rgba(255,255,255,0.85)';
+            ctx.beginPath();
+            ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+          }
+        };
+        drawFighter(this.a);
+        drawFighter(this.b);
+
+        // HUD
+        ctx.save();
+        ctx.font = `${Math.floor(12 * dpr)}px system-ui, -apple-system, Segoe UI, Arial`;
+        ctx.fillStyle = 'rgba(255,255,255,0.9)';
+        ctx.textBaseline = 'top';
+
+        const barW = Math.floor(w * 0.38);
+        const barH = Math.floor(12 * dpr);
+        const topY = pad + Math.floor(10 * dpr);
+
+        ctx.textAlign = 'left';
+        ctx.fillText(this.a.name, pad + 2, topY);
+        this.drawHpBar(pad, topY + Math.floor(16 * dpr), barW, barH, this.a.hp / this.a.maxHp, this.hpColor(this.a.hp / this.a.maxHp));
+        ctx.fillText(`${this.a.hp}/${this.a.maxHp}`, pad + 2, topY + Math.floor(32 * dpr));
+
+        ctx.textAlign = 'right';
+        ctx.fillText(this.b.name, w - pad - 2, topY);
+        this.drawHpBar(w - pad - barW, topY + Math.floor(16 * dpr), barW, barH, this.b.hp / this.b.maxHp, this.hpColor(this.b.hp / this.b.maxHp));
+        ctx.fillText(`${this.b.hp}/${this.b.maxHp}`, w - pad - 2, topY + Math.floor(32 * dpr));
+
+        ctx.restore();
+
+        // Subtle event notice (fade out)
+        if (this.eventText && now < this.eventUntil) {
+          const t = clamp(0, (this.eventUntil - now) / 1600, 1);
+          ctx.save();
+          ctx.globalAlpha = 0.18 + 0.62 * t;
+          ctx.font = `${Math.floor(16 * dpr)}px system-ui, -apple-system, Segoe UI, Arial`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'bottom';
+          ctx.fillStyle = 'rgba(255,255,255,0.92)';
+          ctx.fillText(this.eventText, w / 2, h - pad - Math.floor(46 * dpr));
+          ctx.restore();
+        }
+      }
+    }
+
+    const arena = new BattleArena(battleCtx, battleCanvas);
+    drawBattleIdle();
 
     fetch('pokeLIST.csv')
       .then(r => r.text())
       .then(csvText => {
         const lines = csvText.trim().split(/\r?\n/);
-        lines.shift();
+        const header = lines.shift();
+        const hasStats = (header || '').includes('TYPE') && (header || '').includes('SPATK');
         items = lines.map(line => {
-          const [id,name,url,ball] = line.split(',');
-          return new Pokemon(parseInt(id), name, ball, url);
+          const parts = line.split(',');
+          if (!hasStats || parts.length < 11) {
+            const [id, name, url, ball] = parts;
+            return new Pokemon(parseInt(id), name, ball, url, 'unknown', null);
+          }
+
+          const [
+            id,
+            name,
+            url,
+            ball,
+            type,
+            hp,
+            atk,
+            def,
+            spatk,
+            spdef,
+            spd,
+          ] = parts;
+
+          const stats = {
+            HP: toInt(hp, 60),
+            ATK: toInt(atk, 60),
+            DEF: toInt(def, 60),
+            SPATK: toInt(spatk, 60),
+            SPDEF: toInt(spdef, 60),
+            SPD: toInt(spd, 60),
+          };
+
+          return new Pokemon(parseInt(id), name, ball, url, type, stats);
         });
+
+        // Keep an immutable list for the simulator (wheel pool can shrink).
+        allPokemon = items.slice();
+
+        // Init wheel-size limiter (persisted).
+        try {
+          const raw = localStorage.getItem(WHEEL_LIMIT_KEY);
+          wheelViewLimit = raw ? normalizedWheelLimit(raw) : null;
+        } catch (_) {
+          wheelViewLimit = null;
+        }
+        syncWheelLimitUI();
+        refreshWheelView({ force: true });
         setup();
+
+        loadEliminations();
+
+        populateSimSelectors();
+
+        startBtn.disabled = false;
+        startBtn.textContent = 'Start';
+        exportElimsBtn.disabled = false;
+        resetElimsBtn.disabled = false;
+        updateCountdown();
       })
       .catch(err => console.error('Failed to load CSV', err));
 
+    wheelLimitEl.addEventListener('input', () => {
+      const max = items.length;
+      if (!max) return;
+      const next = normalizedWheelLimit(wheelLimitEl.value);
+      wheelViewLimit = next;
+      wheelLimitValueEl.textContent = String(next);
+
+      try { localStorage.setItem(WHEEL_LIMIT_KEY, String(next)); } catch (_) {}
+
+      if (battleRunning || spinning) {
+        pendingWheelViewRefresh = true;
+        setBanner('Wheel size will update after the current spin/battle.', '#29b6f6');
+        return;
+      }
+
+      refreshWheelView({ force: true });
+      redrawWheelNow();
+    });
+
+    exportElimsBtn.addEventListener('click', () => {
+      exportEliminationsCsv();
+    });
+
+    resetElimsBtn.addEventListener('click', () => {
+      resetEliminations();
+    });
+
+    simStartBtn.addEventListener('click', async () => {
+      try { await audioCtx.resume(); } catch (_) {}
+      syncMuteUI();
+
+      const idA = Number(simASelect.value);
+      const idB = Number(simBSelect.value);
+      if (!Number.isFinite(idA) || !Number.isFinite(idB)) return;
+      if (idA === idB) {
+        setBanner('Pick two different Pokémon for the simulator.', '#e53935');
+        return;
+      }
+
+      const pokeA = getPokemonById(idA);
+      const pokeB = getPokemonById(idB);
+      if (!pokeA || !pokeB) {
+        setBanner('Could not find one of those Pokémon.', '#e53935');
+        return;
+      }
+
+      // Show picks in the VS boxes, but do NOT affect the wheel pool.
+      setSelectionBox(box1, label1, pokeA);
+      setSelectionBox(box2, label2, pokeB);
+
+      await startBattle(pokeA, pokeB, { affectWheelPool: false, preserveSpinState: true });
+    });
+
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    function playPing() { const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain(); osc.connect(gain); gain.connect(audioCtx.destination); osc.frequency.value = 1000; gain.gain.setValueAtTime(0.2, audioCtx.currentTime); osc.start(); osc.stop(audioCtx.currentTime + 0.05); }
-    function playTaDah() { const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain(); osc.connect(gain); gain.connect(audioCtx.destination); const now = audioCtx.currentTime; osc.frequency.setValueAtTime(600, now); osc.frequency.exponentialRampToValueAtTime(200, now + 0.6); gain.gain.setValueAtTime(0.3, now); gain.gain.exponentialRampToValueAtTime(0.001, now + 0.7); osc.start(now); osc.stop(now + 0.7); }
+    const masterGain = audioCtx.createGain();
+    masterGain.gain.value = 1;
+    masterGain.connect(audioCtx.destination);
+
+    let muted = (localStorage.getItem('pokesin_muted') === '1');
+    function syncMuteUI() {
+      muteBtn.textContent = muted ? 'Unmute' : 'Mute';
+      try {
+        masterGain.gain.setValueAtTime(muted ? 0 : 1, audioCtx.currentTime);
+      } catch (_) {}
+      localStorage.setItem('pokesin_muted', muted ? '1' : '0');
+    }
+
+    function playPing() {
+      if (muted) return;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(masterGain);
+      osc.frequency.value = 1000;
+      gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.05);
+    }
+
+    function playTaDah() {
+      if (muted) return;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(masterGain);
+      const now = audioCtx.currentTime;
+      osc.frequency.setValueAtTime(600, now);
+      osc.frequency.exponentialRampToValueAtTime(200, now + 0.6);
+      gain.gain.setValueAtTime(0.3, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.7);
+      osc.start(now);
+      osc.stop(now + 0.7);
+    }
+
+    function makeNoiseBuffer(durationSec) {
+      const sr = audioCtx.sampleRate;
+      const len = Math.max(1, Math.floor(sr * durationSec));
+      const buffer = audioCtx.createBuffer(1, len, sr);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < len; i++) {
+        data[i] = (Math.random() * 2 - 1);
+      }
+      return buffer;
+    }
+
+    function playHitImpact(intensity = 0.6) {
+      // Intensity: 0..1
+      if (muted) return;
+      const t = clamp(0, intensity, 1);
+      const now = audioCtx.currentTime;
+
+      // Noise "thwack"
+      const noise = audioCtx.createBufferSource();
+      noise.buffer = makeNoiseBuffer(0.05 + 0.03 * t);
+
+      const bp = audioCtx.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.frequency.setValueAtTime(700 + 1300 * t, now);
+      bp.Q.setValueAtTime(6 + 6 * t, now);
+
+      const nGain = audioCtx.createGain();
+      nGain.gain.setValueAtTime(0.0001, now);
+      nGain.gain.exponentialRampToValueAtTime(0.18 + 0.22 * t, now + 0.005);
+      nGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.09 + 0.05 * t);
+
+      noise.connect(bp);
+      bp.connect(nGain);
+      nGain.connect(masterGain);
+
+      // Short tone "click"
+      const osc = audioCtx.createOscillator();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(160 + 220 * t, now);
+      osc.frequency.exponentialRampToValueAtTime(90 + 120 * t, now + 0.08);
+
+      const oGain = audioCtx.createGain();
+      oGain.gain.setValueAtTime(0.0001, now);
+      oGain.gain.exponentialRampToValueAtTime(0.08 + 0.10 * t, now + 0.004);
+      oGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.10);
+
+      osc.connect(oGain);
+      oGain.connect(masterGain);
+
+      noise.start(now);
+      noise.stop(now + 0.12 + 0.05 * t);
+      osc.start(now);
+      osc.stop(now + 0.12);
+    }
+
+    function playPowerUpSfx() {
+      if (muted) return;
+      const now = audioCtx.currentTime;
+
+      const osc = audioCtx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(520, now);
+      osc.frequency.exponentialRampToValueAtTime(1100, now + 0.16);
+
+      const gain = audioCtx.createGain();
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(0.22, now + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
+
+      osc.connect(gain);
+      gain.connect(masterGain);
+      osc.start(now);
+      osc.stop(now + 0.25);
+    }
+
+    function playKoSfx() {
+      if (muted) return;
+      const now = audioCtx.currentTime;
+
+      const osc = audioCtx.createOscillator();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(240, now);
+      osc.frequency.exponentialRampToValueAtTime(70, now + 0.35);
+
+      const gain = audioCtx.createGain();
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(0.18, now + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.42);
+
+      const lp = audioCtx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.setValueAtTime(900, now);
+      lp.frequency.exponentialRampToValueAtTime(320, now + 0.35);
+
+      osc.connect(gain);
+      gain.connect(lp);
+      lp.connect(masterGain);
+
+      osc.start(now);
+      osc.stop(now + 0.45);
+    }
+
+    syncMuteUI();
+
+    const BASE_SPIN_PERIOD_MS = 15000;
+    const OPPONENT_SPIN_PERIOD_MS = 11000; // faster second pick (reduce by ~4s)
+    let started = false;
+    let paused = false;
+    let autoSpin = true;
+    let spinIntervalId = null; // actually a timeout id (kept for minimal changes)
+    let countdownIntervalId = null;
+    let nextSpinAtMs = null;
+
+    function currentSpinPeriodMs() {
+      // If we've already locked the first pick, speed up the opponent spin.
+      if (eliminationCount === 1 && !battleRunning) return OPPONENT_SPIN_PERIOD_MS;
+      return BASE_SPIN_PERIOD_MS;
+    }
+
+    function stopAutoSpin() {
+      if (spinIntervalId !== null) {
+        clearTimeout(spinIntervalId);
+        spinIntervalId = null;
+      }
+      if (countdownIntervalId !== null) {
+        clearInterval(countdownIntervalId);
+        countdownIntervalId = null;
+      }
+      nextSpinAtMs = null;
+    }
+
+    function updateCountdown() {
+      if (!items.length) {
+        nextSpinEl.textContent = 'Loading…';
+        return;
+      }
+      if (!started) {
+        nextSpinEl.textContent = 'Not started';
+        return;
+      }
+      if (paused) {
+        nextSpinEl.textContent = 'Paused';
+        return;
+      }
+      if (!autoSpin) {
+        nextSpinEl.textContent = 'Auto: off';
+        return;
+      }
+      if (items.length <= 1) {
+        nextSpinEl.textContent = 'Finished';
+        return;
+      }
+      if (nextSpinAtMs === null) {
+        nextSpinEl.textContent = 'Next spin in: --';
+        return;
+      }
+
+      const remainingSec = Math.max(0, Math.ceil((nextSpinAtMs - Date.now()) / 1000));
+      nextSpinEl.textContent = `Next spin in: ${remainingSec}s`;
+    }
+
+    function startAutoSpin() {
+      stopAutoSpin();
+
+      const scheduleNext = () => {
+        if (!started || paused || !autoSpin) {
+          spinIntervalId = setTimeout(scheduleNext, 250);
+          return;
+        }
+        if (items.length <= 1) {
+          stopAutoSpin();
+          return;
+        }
+        if (battleRunning || spinning) {
+          spinIntervalId = setTimeout(scheduleNext, 250);
+          return;
+        }
+
+        startSpin();
+        const period = currentSpinPeriodMs();
+        nextSpinAtMs = Date.now() + period;
+        updateCountdown();
+        spinIntervalId = setTimeout(scheduleNext, period);
+      };
+
+      const initialPeriod = currentSpinPeriodMs();
+      nextSpinAtMs = Date.now() + initialPeriod;
+      spinIntervalId = setTimeout(scheduleNext, initialPeriod);
+
+      countdownIntervalId = setInterval(updateCountdown, 250);
+      updateCountdown();
+    }
 
     function setup() {
       size = Math.min(window.innerWidth, window.innerHeight) * 0.675;
@@ -117,63 +1902,158 @@
       buffer.width = canvas.width = dim;
       buffer.height = canvas.height = dim;
       center = dim / 2;
+      refreshWheelView({ force: false });
       drawStaticWheel(); drawWheel(0); updateLabel(0);
+      drawBattleIdle();
     }
 
     function drawStaticWheel() {
       if (!buffer.width) return;
-      const seg = (2 * Math.PI) / items.length;
+      const count = wheelView.length;
+      if (!count) {
+        bctx.clearRect(0,0,buffer.width,buffer.height);
+        bctx.beginPath(); bctx.arc(center,center,30,0,2*Math.PI);
+        bctx.fillStyle='#fff'; bctx.fill();
+        return;
+      }
+      const seg = (2 * Math.PI) / count;
       const r = Math.max(center - 30, 0);
       bctx.clearRect(0,0,buffer.width,buffer.height);
-      items.forEach((_,i)=>{
+      wheelView.forEach((_,i)=>{
         const s = i*seg;
         bctx.beginPath(); bctx.moveTo(center,center);
         bctx.arc(center,center,r,s,s+seg);
         bctx.closePath();
-        bctx.fillStyle = `hsl(${i*360/items.length},70%,60%)`;
+        bctx.fillStyle = `hsl(${i*360/count},70%,60%)`;
         bctx.fill();
       });
+
+      // Segment labels (Pokémon names): centered in each wedge and rotated sideways.
+      const labelRadius = r * 0.62;
+      const baseFont = clamp(9, Math.floor((buffer.width / Math.max(1, count)) * 1.15), 18);
+
+      bctx.save();
+      bctx.translate(center, center);
+      bctx.textAlign = 'center';
+      bctx.textBaseline = 'middle';
+      bctx.fillStyle = 'rgba(255,255,255,0.92)';
+      bctx.strokeStyle = 'rgba(0,0,0,0.62)';
+
+      const setFont = (px) => {
+        const p = Math.max(8, Math.floor(px));
+        bctx.font = `900 ${p}px system-ui, -apple-system, Segoe UI, Arial`;
+        bctx.lineWidth = Math.max(2, Math.floor(p * 0.18));
+        return p;
+      };
+
+      for (let i = 0; i < count; i++) {
+        const p = wheelView[i];
+        const nameRaw = String(p?.name || '');
+        if (!nameRaw) continue;
+
+        const startA = i * seg;
+        const endA = startA + seg;
+        const mid = startA + (seg / 2);
+
+        // Clip to this wedge so long names don't spill across segments.
+        bctx.save();
+        bctx.beginPath();
+        bctx.moveTo(0, 0);
+        bctx.arc(0, 0, r, startA, endA);
+        bctx.closePath();
+        bctx.clip();
+
+        // Available width ~= arc length at the label radius.
+        const maxW = Math.max(24, (seg * labelRadius) * 0.86);
+
+        // Fit by shrinking font; ellipsis only as a last resort.
+        let fontPx = setFont(baseFont);
+        while (fontPx > 9 && bctx.measureText(nameRaw).width > maxW) {
+          fontPx = setFont(fontPx - 1);
+        }
+
+        let name = nameRaw;
+        if (bctx.measureText(name).width > maxW) {
+          while (name.length > 2 && bctx.measureText(name + '…').width > maxW) {
+            name = name.slice(0, -1);
+          }
+          name = name.length ? (name + '…') : '';
+        }
+        if (!name) { bctx.restore(); continue; }
+
+        // Centered in the wedge and sideways.
+        // We rotate to the wedge center, then rotate 90° so text is sideways.
+        // (Clipping prevents the "ring of text" overlap.)
+        let rot = mid + Math.PI / 2;
+        const angleNorm = ((mid % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+        const flipped = (angleNorm > Math.PI / 2 && angleNorm < (3 * Math.PI) / 2);
+        if (flipped) rot += Math.PI;
+        bctx.rotate(rot);
+
+        // Draw at mid-radius (visually centered in slice).
+        // When flipped, mirror the Y so the label stays on the same wedge.
+        const y = flipped ? labelRadius : -labelRadius;
+        bctx.strokeText(name, 0, y);
+        bctx.fillText(name, 0, y);
+
+        bctx.restore();
+      }
+      bctx.restore();
+
       bctx.beginPath(); bctx.arc(center,center,30,0,2*Math.PI);
       bctx.fillStyle='#fff'; bctx.fill();
     }
 
     let lastIndex = -1;
-    function drawWheel(a) {
+    function drawWheel(a, silent = false) {
       if (!buffer.width) { setup(); return; }
       ctx.clearRect(0,0,canvas.width,canvas.height);
       ctx.save(); ctx.translate(center,center); ctx.rotate(a);
       ctx.drawImage(buffer,-center,-center);
       ctx.restore();
       const idx = getCurrentIndex(a);
-      if (idx !== lastIndex) { playPing(); lastIndex = idx; }
+      if (idx !== lastIndex) {
+        if (!silent) playPing();
+        lastIndex = idx;
+      }
     }
     function getCurrentIndex(a) {
-      const seg = (2*Math.PI)/items.length;
+      const count = wheelView.length;
+      if (!count) return 0;
+      const seg = (2*Math.PI)/count;
       let raw = -Math.PI/2 - a;
       raw = (raw%(2*Math.PI)+2*Math.PI)%(2*Math.PI);
       return Math.floor(raw/seg);
     }
     function updateLabel(a) {
-      if (!items.length) return;
-      label.textContent = items[getCurrentIndex(a)].name;
+      if (!wheelView.length) return;
+      label.textContent = wheelView[getCurrentIndex(a)].name;
     }
 
     let spinning = false;
     function startSpin() {
-    // ——— Reset boxes once you’ve already filled box2 ———
-      if (eliminationCount >= 2) {
-        eliminationCount = 0;
-        box1.innerHTML = '';
-        label1.textContent = '';
-        box2.innerHTML = '';
-        label2.textContent = '';
-      }
-      if (pendingRemovalIdx !== null) { items.splice(pendingRemovalIdx,1); pendingRemovalIdx = null; drawStaticWheel(); }
+      if (battleRunning) return;
       if (spinning || !items.length) return;
+      if (items.length <= 1) {
+        setBanner(`Champion: ${items[0]?.name || 'Unknown'}!`, '#7b61ff');
+        return;
+      }
+
+      // If the wheel view is limited, ensure it's ready and usable.
+      refreshWheelView({ force: false });
+      if (wheelView.length <= 1) {
+        setBanner('Wheel size too small to spin. Increase the slider.', '#e53935');
+        return;
+      }
+
       spinning = true; label.textContent = 'SPINNING...'; label.classList.remove('result');
       const sd=4000, dd=3000, st=performance.now();
       let lt=st, ca=0;
-      const ic=items.length, sg=(2*Math.PI)/ic, ti=Math.floor(Math.random()*ic), ch=items[ti];
+      const ic=wheelView.length, sg=(2*Math.PI)/ic;
+      const excludeId = (eliminationCount === 1 && selectedA) ? selectedA.id : null;
+      const ti = pickRandomWheelIndex(excludeId);
+      if (ti < 0) { spinning = false; return; }
+      const ch=wheelView[ti];
       let sa, td; const ex=3, v=Math.random()*0.005+0.005;
       function reveal(box, labelElem, pokemon) {
         labelElem.style.color='#2c2c2c'; labelElem.textContent=''; box.innerHTML='';
@@ -184,8 +2064,15 @@
         setTimeout(()=>{img.style.transform='rotate(0deg)'; playTaDah();}, 2000);
         setTimeout(()=>{ box.innerHTML=''; box.appendChild(pokemon.image.cloneNode()); labelElem.style.color='#fff'; labelElem.textContent=pokemon.name; }, 2500);
       }
+
+      async function beginBattleIfReady() {
+        if (!selectedA || !selectedB || battleRunning) return;
+        await startBattle(selectedA, selectedB, { affectWheelPool: true, preserveSpinState: false });
+      }
+
       function frame(now) {
         const e=now-st, dt=now-lt; lt=now;
+        let pickedIdToRemove = null;
         if(e<sd) ca+=v*dt;
         else if(e<sd+dd) {
           if(sa===undefined) {
@@ -195,29 +2082,114 @@
           }
           const t=(e-sd)/dd; ca=sa+td*(1-Math.pow(1-t,3));
         } else {
-          ca=sa+td; pendingRemovalIdx=ti;
-          if(eliminationCount===0) reveal(box1,label1,ch);
-          else if(eliminationCount===1) reveal(box2,label2,ch);
+          ca=sa+td;
+          if(eliminationCount===0) {
+            selectedA = ch;
+            reveal(box1,label1,ch);
+            setBanner('First pick locked. Spin for the opponent!', 'rgb(91, 169, 91)');
+            pickedIdToRemove = ch.id;
+          }
+          else if(eliminationCount===1) {
+            selectedB = ch;
+            reveal(box2,label2,ch);
+            setBanner('Opponent locked. Starting battle…', '#ff6f00');
+            setTimeout(beginBattleIfReady, 2600);
+            pickedIdToRemove = ch.id;
+          }
           eliminationCount++;
-          totalCount++;
-          counterEl.textContent = `Eliminated: ${totalCount}`;
         }
         drawWheel(ca); updateLabel(ca);
+        // Remove selected Pokémon from the wheel pool AFTER drawing the final frame,
+        // so we don't break angle/index math for this spin.
+        if (pickedIdToRemove !== null) {
+          setTimeout(() => removePokemonById(pickedIdToRemove), 0);
+        }
         if(e<sd+dd) requestAnimationFrame(frame);
-        else { label.classList.add('result'); playTaDah(); spinning=false; lastIndex=-1; }
+        else {
+          label.classList.add('result');
+          playTaDah();
+          spinning=false;
+          lastIndex=-1;
+
+          if (pendingWheelViewRefresh && !battleRunning) {
+            pendingWheelViewRefresh = false;
+            syncWheelLimitUI();
+            refreshWheelView({ force: true });
+            redrawWheelNow();
+          }
+        }
       }
       requestAnimationFrame(frame);
     }
-    //container.addEventListener('click', startSpin);
-    startSpin();
-    const spinInterval = setInterval(() => {
-    if (items.length > 1) {
-        startSpin();
-        } else {
-        clearInterval(spinInterval);
-        }
-    }, 15000);
+
+    // Allow manual spins by clicking the wheel, but only after Start.
+    container.addEventListener('click', () => {
+      if (!started) return;
+      startSpin();
+    });
+
+    startBtn.addEventListener('click', async () => {
+      // First click = start the show (and satisfy browser audio policies).
+      if (!started) {
+        started = true;
+        paused = false;
+        startBtn.textContent = 'Spin Now';
+      }
+
+      try { await audioCtx.resume(); } catch (_) {}
+      syncMuteUI();
+
+      // Immediate spin on Start/Spin Now.
+      startSpin();
+
+      // Manage auto-spin.
+      autoSpin = autoToggle.checked;
+      pauseBtn.disabled = !autoSpin;
+      if (autoSpin && !paused) startAutoSpin();
+      else stopAutoSpin();
+
+      updateCountdown();
+    });
+
+    muteBtn.addEventListener('click', async () => {
+      // Some browsers require user interaction; this click counts.
+      try { await audioCtx.resume(); } catch (_) {}
+      muted = !muted;
+      syncMuteUI();
+    });
+
+    pauseBtn.addEventListener('click', () => {
+      if (!started) return;
+
+      if (!paused) {
+        paused = true;
+        pauseBtn.textContent = 'Resume';
+        stopAutoSpin();
+      } else {
+        paused = false;
+        pauseBtn.textContent = 'Pause';
+        if (autoToggle.checked) startAutoSpin();
+      }
+      updateCountdown();
+    });
+
+    autoToggle.addEventListener('change', () => {
+      autoSpin = autoToggle.checked;
+      pauseBtn.disabled = !autoSpin;
+
+      if (!started) {
+        updateCountdown();
+        return;
+      }
+
+      if (autoSpin && !paused) startAutoSpin();
+      else stopAutoSpin();
+
+      updateCountdown();
+    });
+
     window.addEventListener('resize', setup);
+    window.addEventListener('resize', () => drawBattleIdle());
     setup();
   </script>
 </body>
