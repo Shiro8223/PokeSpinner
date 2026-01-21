@@ -20,6 +20,7 @@
       display: flex;
       flex-direction: column;
       align-items: center;
+      flex-shrink: 0;
     }
     #capture-inner {
       width: 100%;
@@ -191,6 +192,30 @@
       #capture-frame { width: 96vw; }
       #wheel-container { max-width: 9999px; }
       #elimination { margin-top: 6px; }
+    }
+
+    /* Mobile: let the 9:16 frame own the viewport and keep controls below */
+    @media (max-width: 780px) {
+      body, html {
+        align-items: center;
+        justify-content: flex-start;
+        gap: 14px;
+      }
+      #capture-frame {
+        width: min(100vw, calc(100vh * 9 / 16));
+        height: min(100vh, calc(100vw * 16 / 9));
+        max-height: 100vh;
+        max-width: 100vw;
+        border-radius: 18px;
+      }
+      #controls,
+      #sim-controls {
+        width: 100%;
+        max-width: 720px;
+        box-sizing: border-box;
+        padding-left: 12px;
+        padding-right: 12px;
+      }
     }
 
     
