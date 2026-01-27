@@ -5,13 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Spin the Wheel</title>
   <style>
-    body, html { margin: 0; padding: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #141414; }
+    body, html { margin: 0; padding: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; background: #141414; overflow-y: auto; }
 
     /* 9:16 capture frame (record this area) */
     #capture-frame {
       width: min(480px, 96vw);
       aspect-ratio: 9 / 16;
-      max-height: 96vh;
       background: #2c2c2c;
       border: 3px solid rgba(255,255,255,0.22);
       border-radius: 22px;
@@ -21,6 +20,7 @@
       flex-direction: column;
       align-items: center;
       flex-shrink: 0;
+      margin: 12px auto;
     }
     #capture-inner {
       width: 100%;
@@ -98,6 +98,17 @@
 
     #export-elims { background: #66bb6a; }
     #reset-elims { background: #ef5350; color: #0b1020; }
+
+    /* Filter Controls */
+    #filter-section { background: rgba(255,255,255,0.08); padding: 12px; border-radius: 8px; margin-top: 12px; border: 1px solid rgba(255,255,255,0.15); }
+    #filter-section-title { color: #ffeb3b; font-weight: 700; font-size: 0.9em; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .filter-group { margin-bottom: 10px; }
+    .filter-group-label { color: #fff; font-weight: 600; font-size: 0.85em; margin-bottom: 6px; display: block; }
+    .filter-options { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .filter-options label { color: #fff; font-weight: 400; font-size: 0.85em; margin: 0; display: flex; align-items: center; gap: 4px; cursor: pointer; }
+    .filter-options input[type="checkbox"] { cursor: pointer; width: 16px; height: 16px; accent-color: #ffeb3b; }
+    .filter-options select { padding: 6px 8px; border-radius: 4px; border: 1px solid #666; background: #333; color: #fff; font-weight: 500; font-size: 0.85em; cursor: pointer; }
+    #filter-apply-btn { background: #ffeb3b; color: #222; border: 0; border-radius: 4px; padding: 8px 16px; font-weight: 700; cursor: pointer; font-size: 0.85em; }
 
     /* Simulator controls (outside the capture frame) */
     #sim-controls {
@@ -199,26 +210,41 @@
       body, html {
         align-items: center;
         justify-content: flex-start;
-        gap: 14px;
       }
       #capture-frame {
         width: min(100vw, calc(100vh * 9 / 16));
-        height: min(100vh, calc(100vw * 16 / 9));
-        max-height: 100vh;
-        max-width: 100vw;
-        border-radius: 18px;
+        margin: 12px auto;
+      }
+      #controls-wrapper {
+        width: 100%;
+        max-width: min(480px, 96vw);
+        box-sizing: border-box;
+        padding: 12px;
+        margin: 0 auto 20px;
       }
       #controls,
       #sim-controls {
         width: 100%;
-        max-width: 720px;
         box-sizing: border-box;
-        padding-left: 12px;
-        padding-right: 12px;
+        padding-left: 0;
+        padding-right: 0;
       }
     }
 
-    
+    /* Controls wrapper for desktop */
+    #controls-wrapper {
+      width: 100%;
+      max-width: min(480px, 96vw);
+      box-sizing: border-box;
+      padding: 12px;
+      margin: 0 auto;
+    }
+
+    #controls,
+    #sim-controls {
+      width: 100%;
+      box-sizing: border-box;
+    }
 
   </style>
 </head>
@@ -277,6 +303,7 @@
     </div>
   </div>
 
+  <div id="controls-wrapper">
   <div id="controls">
     <button id="start-btn" disabled>Loading…</button>
     <button id="pause-btn" disabled>Pause</button>
@@ -292,6 +319,37 @@
     <button id="reset-elims" disabled>Reset Eliminations</button>
   </div>
 
+  <div id="filter-section">
+    <div id="filter-section-title">⚙️ Pokémon Filter</div>
+    
+    <div class="filter-group">
+      <label class="filter-group-label">Filter Mode:</label>
+      <div class="filter-options">
+        <label><input type="radio" name="filter-mode" value="all" checked> All Pokémon</label>
+        <label><input type="radio" name="filter-mode" value="type"> By Type</label>
+        <label><input type="radio" name="filter-mode" value="ball"> By Pokéball Type</label>
+      </div>
+    </div>
+
+    <div class="filter-group" id="type-filter-group" style="display:none;">
+      <label class="filter-group-label">Select Types (multi-select):</label>
+      <div class="filter-options" id="type-filter-options"></div>
+    </div>
+
+    <div class="filter-group" id="ball-filter-group" style="display:none;">
+      <label class="filter-group-label">Pokéball Type:</label>
+      <div class="filter-options">
+        <label><input type="checkbox" name="ball-type" value="pokeball" checked> Pokéball</label>
+        <label><input type="checkbox" name="ball-type" value="greatball" checked> Great Ball</label>
+        <label><input type="checkbox" name="ball-type" value="ultraball" checked> Ultra Ball</label>
+        <label><input type="checkbox" name="ball-type" value="masterball" checked> Master Ball</label>
+        <label><input type="checkbox" name="ball-type" value="beastball" checked> Beast Ball</label>
+      </div>
+    </div>
+
+    <button id="filter-apply-btn">Apply Filters</button>
+  </div>
+
   <div id="sim-controls" aria-label="Battle simulator">
     <span class="sim-label">Simulator:</span>
     <select id="sim-a" disabled>
@@ -301,6 +359,7 @@
       <option>Loading…</option>
     </select>
     <button id="sim-start" disabled>Simulate Battle</button>
+  </div>
   </div>
 
   <script>
@@ -353,6 +412,11 @@
     }
 
     let items = [], allPokemon = [], eliminationCount = 0, totalCount = 0;
+
+    // Filter state
+    let filterMode = 'all'; // 'all', 'type', or 'ball'
+    let selectedTypes = new Set();
+    let selectedBallTypes = new Set(['pokeball', 'greatball', 'ultraball', 'masterball', 'beastball']);
 
     // Wheel view limiter (UI-only): the wheel can show a stable subset of the full pool.
     const WHEEL_LIMIT_KEY = 'pokespin_wheel_limit_v1';
@@ -609,6 +673,84 @@
         .split('/')
         .map(s => s.trim())
         .filter(Boolean);
+    }
+
+    // Filter functions
+    function getUniqueTypes() {
+      const types = new Set();
+      for (const pokemon of allPokemon) {
+        const pTypes = parseTypes(pokemon.type);
+        pTypes.forEach(t => types.add(t));
+      }
+      return Array.from(types).sort();
+    }
+
+    function applyFilters() {
+      if (filterMode === 'all') {
+        items = allPokemon.slice();
+      } else if (filterMode === 'type') {
+        if (selectedTypes.size === 0) {
+          items = allPokemon.slice();
+        } else {
+          items = allPokemon.filter(p => {
+            const pTypes = parseTypes(p.type);
+            return pTypes.some(t => selectedTypes.has(t));
+          });
+        }
+      } else if (filterMode === 'ball') {
+        if (selectedBallTypes.size === 0) {
+          items = allPokemon.slice();
+        } else {
+          items = allPokemon.filter(p => {
+            const ballKey = String(p.ball || '').toLowerCase().trim();
+            return selectedBallTypes.has(ballKey);
+          });
+        }
+      }
+      
+      // Reset wheel view and re-draw
+      wheelViewLimit = null;
+      syncWheelLimitUI();
+      refreshWheelView({ force: true });
+      setup();
+      populateSimSelectors();
+      
+      // Reset selected box if it contains a filtered-out pokemon
+      if (eliminationCount > 0) {
+        if (selectedA && !items.find(p => p.id === selectedA.id)) {
+          selectedA = null;
+          resetSelectionBoxes();
+        }
+        if (selectedB && !items.find(p => p.id === selectedB.id)) {
+          selectedB = null;
+          resetSelectionBoxes();
+        }
+      }
+      
+      setBanner(`✓ Showing ${items.length} Pokémon`, '#29b6f6');
+    }
+
+    function initializeFilterUI() {
+      const typeFilterOptions = document.getElementById('type-filter-options');
+      const types = getUniqueTypes();
+      
+      typeFilterOptions.innerHTML = '';
+      types.forEach(type => {
+        const label = document.createElement('label');
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.value = type;
+        checkbox.addEventListener('change', (e) => {
+          if (e.target.checked) {
+            selectedTypes.add(type);
+          } else {
+            selectedTypes.delete(type);
+          }
+        });
+        label.appendChild(checkbox);
+        label.appendChild(document.createTextNode(type.charAt(0).toUpperCase() + type.slice(1)));
+        typeFilterOptions.appendChild(label);
+      });
     }
 
     function typeMultiplier(attackType, defenderTypes) {
@@ -1625,6 +1767,9 @@
         loadEliminations();
 
         populateSimSelectors();
+        
+        // Initialize filter UI
+        initializeFilterUI();
 
         startBtn.disabled = false;
         startBtn.textContent = 'Start';
@@ -2211,6 +2356,54 @@
       else stopAutoSpin();
 
       updateCountdown();
+    });
+
+    // Filter controls
+    const filterModeRadios = document.querySelectorAll('input[name="filter-mode"]');
+    const typeFilterGroup = document.getElementById('type-filter-group');
+    const ballFilterGroup = document.getElementById('ball-filter-group');
+    const filterApplyBtn = document.getElementById('filter-apply-btn');
+
+    filterModeRadios.forEach(radio => {
+      radio.addEventListener('change', (e) => {
+        filterMode = e.target.value;
+        typeFilterGroup.style.display = filterMode === 'type' ? 'block' : 'none';
+        ballFilterGroup.style.display = filterMode === 'ball' ? 'block' : 'none';
+      });
+    });
+
+    document.querySelectorAll('input[name="ball-type"]').forEach(checkbox => {
+      // Initialize from selectedBallTypes
+      checkbox.checked = selectedBallTypes.has(checkbox.value);
+      
+      checkbox.addEventListener('change', (e) => {
+        if (e.target.checked) {
+          selectedBallTypes.add(e.target.value);
+        } else {
+          selectedBallTypes.delete(e.target.value);
+        }
+      });
+    });
+
+    filterApplyBtn.addEventListener('click', () => {
+      if (started || battleRunning) {
+        setBanner('Cannot change filters during a tournament. Reset to apply new filters.', '#ff9800');
+        return;
+      }
+      
+      // Check if any filters are actually selected
+      if (filterMode === 'type' && selectedTypes.size === 0) {
+        setBanner('Please select at least one type', '#ff9800');
+        return;
+      }
+      if (filterMode === 'ball' && selectedBallTypes.size === 0) {
+        setBanner('Please select at least one pokéball type', '#ff9800');
+        return;
+      }
+      
+      applyFilters();
+      // Reset selection boxes if they exist
+      resetSelectionBoxes();
     });
 
     window.addEventListener('resize', setup);
