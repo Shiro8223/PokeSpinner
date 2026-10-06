@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pokédex Tracker</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #141414; color: #fff; font-family: system-ui, sans-serif; }
+    #topbar {
+      position: sticky; top: 0; z-index: 10; background: #2c2c2c;
+      border-bottom: 3px solid rgba(255,255,255,0.22); padding: 10px 14px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.5);
+    }
+    #topbar .row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+    #overall { background: #e91e63; padding: 0.3em 1em; border-radius: 1em; font-weight: 800; font-size: 1.1em; white-space: nowrap; }
+    .back { background: #ffeb3b; color: #222; text-decoration: none; font-weight: 800; padding: 8px 14px; border-radius: 999px; }
+    #gen-stats { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .gen-chip { background: rgba(255,255,255,0.1); border-radius: 999px; padding: 3px 10px; font-size: 0.85em; font-variant-numeric: tabular-nums; }
+    .gen-chip.done { background: #2e7d32; }
+    #search { flex: 1 1 180px; min-width: 140px; padding: 8px 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.1); color: #fff; font-weight: 600; outline: none; }
+    #search::placeholder { color: rgba(255,255,255,0.55); }
+    .toggle { display: flex; align-items: center; gap: 6px; font-weight: 700; user-select: none; cursor: pointer; }
+    .toggle input { accent-color: #ffeb3b; }
+    main { padding: 14px; max-width: 1200px; margin: 0 auto; }
+    section.gen h2 { margin: 18px 0 8px; font-size: 1.1em; display: flex; justify-content: space-between; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+    .mon {
+      position: relative; cursor: pointer; border: 2px solid rgba(255,255,255,0.15); border-radius: 12px;
+      background: #2c2c2c; color: #fff; padding: 6px 4px 8px; display: flex; flex-direction: column; align-items: center; font: inherit;
+    }
+    .mon:focus-visible { outline: 3px solid #29b6f6; }
+    .mon img { width: 80px; height: 80px; object-fit: contain; filter: grayscale(1) brightness(0.55); transition: filter 0.15s; }
+    .mon .num { font-size: 0.75em; opacity: 0.7; }
+    .mon .nm { font-size: 0.8em; font-weight: 700; text-transform: capitalize; text-align: center; word-break: break-word; }
+    .mon.caught { border-color: #66bb6a; background: #1f3a24; }
+    .mon.caught img { filter: none; }
+    .mon.caught::after { content: "✓"; position: absolute; top: 2px; right: 6px; color: #66bb6a; font-weight: 900; }
+    .hidden { display: none !important; }
+    #status { padding: 20px; text-align: center; opacity: 0.8; }
+  </style>
+</head>
+<body>
+  <div id="topbar">
+    <div class="row">
+      <a class="back" href="index.html">&larr; Spinner</a>
+      <span id="overall">Loading…</span>
+      <input id="search" type="search" placeholder="Search name or #" aria-label="Search Pokémon" />
+      <label class="toggle"><input id="only-missing" type="checkbox"> Show only missing</label>
+    </div>
+    <div id="gen-stats"></div>
+  </div>
+  <main>
+    <div id="status">Loading Pokédex…</div>
+    <div id="dex"></div>
+  </main>
+
+<script>
+(() => {
+  const STORE_KEY = 'pokespin.pokedex.v1';
+  const GEN_KEY = 'pokespin.pokedex.gen.v1';
+  const MAX_DEX = 1025;
+  const GEN_RANGES = [[1,151],[152,251],[252,386],[387,493],[494,649],[650,721],[722,809],[810,905],[906,1025]];
+  const MISSING_NAMES = {
+    29: 'nidoran-f', 32: 'nidoran-m', 875: 'eiscue', 984: 'great-tusk', 985: 'scream-tail', 986: 'brute-bonnet',
+    987: 'flutter-mane', 988: 'slither-wing', 989: 'sandy-shocks', 990: 'iron-treads', 991: 'iron-bundle',
+    992: 'iron-hands', 993: 'iron-jugulis', 994: 'iron-moth', 995: 'iron-thorns', 1005: 'roaring-moon',
+    1006: 'iron-valiant', 1009: 'walking-wake', 1010: 'iron-leaves', 1020: 'gouging-fire', 1021: 'raging-bolt',
+    1022: 'iron-boulder', 1023: 'iron-crown',
+  };
+  const GEN_NAMES = ['I Kanto','II Johto','III Hoenn','IV Sinnoh','V Unova','VI Kalos','VII Alola','VIII Galar','IX Paldea'];
+
+  const dexEl = document.getElementById('dex');
+  const statsEl = document.getElementById('gen-stats');
+  const overallEl = document.getElementById('overall');
+  const statusEl = document.getElementById('status');
+  const searchEl = document.getElementById('search');
+  const missingEl = document.getElementById('only-missing');
+
+  let caught = loadCaught();
+  const cards = new Map(); // id -> { el, name, gen }
+  const genInfo = []; // per gen: { ids: [], chip, countEl, sectionEl }
+
+  function loadCaught() {
+    try {
+      const arr = JSON.parse(localStorage.getItem(STORE_KEY));
+      if (Array.isArray(arr)) return new Set(arr.filter(n => Number.isInteger(n)));
+    } catch {}
+    return new Set();
+  }
+  function saveCaught() {
+    try { localStorage.setItem(STORE_KEY, JSON.stringify([...caught])); } catch {}
+  }
+
+  function fallbackGen(id) {
+    return GEN_RANGES.findIndex(([a, b]) => id >= a && id <= b);
+  }
+
+  // One request per generation; result cached as { id: genIndex }.
+  async function loadGenMap() {
+    try {
+      const cached = JSON.parse(localStorage.getItem(GEN_KEY));
+      if (cached && Object.keys(cached).length >= MAX_DEX) return cached;
+    } catch {}
+    try {
+      const map = {};
+      const results = await Promise.all(GEN_RANGES.map((_, i) =>
+        fetch(`https://pokeapi.co/api/v2/generation/${i + 1}`).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+      ));
+      results.forEach((g, i) => {
+        g.pokemon_species.forEach(s => {
+          const id = parseInt(s.url.split('/').filter(Boolean).pop(), 10);
+          if (Number.isFinite(id)) map[id] = i;
+        });
+      });
+      localStorage.setItem(GEN_KEY, JSON.stringify(map));
+      return map;
+    } catch {
+      return null;
+    }
+  }
+
+  function parseCsv(text) {
+    const lines = text.trim().split(/\r?\n/);
+    lines.shift();
+    const out = [];
+    for (const line of lines) {
+      const [id, name, url] = line.split(',');
+      const n = Number(id);
+      // Dex numbers only: forms/variants use IDs >= 10000.
+      if (!/^\d+$/.test(id) || n < 1 || n > MAX_DEX) continue;
+      out.push({ id: n, name, url });
+    }
+    const seen = new Set();
+    const unique = out.filter(p => !seen.has(p.id) && seen.add(p.id));
+    // Dex entries absent from the CSV (its base entries are missing or only listed as forms).
+    for (const [id, name] of Object.entries(MISSING_NAMES)) {
+      if (!seen.has(Number(id))) {
+        unique.push({ id: Number(id), name, url: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png` });
+      }
+    }
+    return unique.sort((a, b) => a.id - b.id);
+  }
+
+  function build(mons, genMap) {
+    GEN_RANGES.forEach((_, i) => {
+      const section = document.createElement('section');
+      section.className = 'gen';
+      const h2 = document.createElement('h2');
+      const title = document.createElement('span');
+      title.textContent = `Gen ${GEN_NAMES[i]}`;
+      const count = document.createElement('span');
+      h2.append(title, count);
+      const grid = document.createElement('div');
+      grid.className = 'grid';
+      section.append(h2, grid);
+      dexEl.appendChild(section);
+
+      const chip = document.createElement('span');
+      chip.className = 'gen-chip';
+      statsEl.appendChild(chip);
+      genInfo.push({ ids: [], chip, count, section, grid });
+    });
+
+    for (const p of mons) {
+      const gi = genMap && genMap[p.id] !== undefined ? genMap[p.id] : fallbackGen(p.id);
+      if (gi < 0) continue;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'mon';
+      const img = document.createElement('img');
+      img.loading = 'lazy';
+      img.alt = '';
+      img.src = p.url;
+      const num = document.createElement('span');
+      num.className = 'num';
+      num.textContent = `#${String(p.id).padStart(4, '0')}`;
+      const nm = document.createElement('span');
+      nm.className = 'nm';
+      nm.textContent = p.name;
+      btn.append(img, num, nm);
+      btn.addEventListener('click', () => toggle(p.id));
+      genInfo[gi].grid.appendChild(btn);
+      genInfo[gi].ids.push(p.id);
+      cards.set(p.id, { el: btn, name: p.name.toLowerCase(), gen: gi });
+    }
+  }
+
+  function toggle(id) {
+    if (caught.has(id)) caught.delete(id); else caught.add(id);
+    saveCaught();
+    refresh();
+  }
+
+  function refresh() {
+    const q = searchEl.value.trim().toLowerCase().replace(/^#/, '');
+    const onlyMissing = missingEl.checked;
+    let total = 0, done = 0;
+
+    genInfo.forEach(g => {
+      const gDone = g.ids.filter(id => caught.has(id)).length;
+      const pct = g.ids.length ? Math.floor((gDone / g.ids.length) * 100) : 0;
+      g.chip.textContent = `${g.section.querySelector('h2 span').textContent.split(' ')[1]}: ${pct}% (${gDone}/${g.ids.length})`;
+      g.chip.classList.toggle('done', g.ids.length > 0 && gDone === g.ids.length);
+      g.count.textContent = `${pct}% — ${gDone}/${g.ids.length}`;
+      total += g.ids.length;
+      done += gDone;
+    });
+
+    cards.forEach((c, id) => {
+      const isCaught = caught.has(id);
+      c.el.classList.toggle('caught', isCaught);
+      c.el.setAttribute('aria-pressed', String(isCaught));
+      const matches = !q || c.name.includes(q) || String(id) === q.replace(/^0+/, '');
+      c.el.classList.toggle('hidden', !matches || (onlyMissing && isCaught));
+    });
+
+    genInfo.forEach(g => {
+      g.section.classList.toggle('hidden', !g.ids.some(id => !cards.get(id).el.classList.contains('hidden')));
+    });
+
+    const pct = total ? ((done / total) * 100).toFixed(1) : '0.0';
+    overallEl.textContent = `Pokédex: ${pct}% (${done}/${total})`;
+  }
+
+  async function init() {
+    try {
+      const [csvText, genMap] = await Promise.all([
+        fetch('pokeLIST.csv').then(r => r.text()),
+        loadGenMap(),
+      ]);
+      build(parseCsv(csvText), genMap);
+      statusEl.remove();
+      refresh();
+    } catch (e) {
+      statusEl.textContent = 'Failed to load Pokédex data (open via a local web server).';
+    }
+  }
+
+  searchEl.addEventListener('input', refresh);
+  missingEl.addEventListener('change', refresh);
+  init();
+})();
+</script>
+</body>
+</html>
