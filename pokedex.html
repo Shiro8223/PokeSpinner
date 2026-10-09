@@ -16,8 +16,11 @@
     #overall { background: #e91e63; padding: 0.3em 1em; border-radius: 1em; font-weight: 800; font-size: 1.1em; white-space: nowrap; }
     .back { background: #ffeb3b; color: #222; text-decoration: none; font-weight: 800; padding: 8px 14px; border-radius: 999px; }
     #gen-stats { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-    .gen-chip { background: rgba(255,255,255,0.1); border-radius: 999px; padding: 3px 10px; font-size: 0.85em; font-variant-numeric: tabular-nums; }
+    .gen-chip { background: rgba(255,255,255,0.1); color: #fff; border: 0; font: inherit; cursor: pointer; border-radius: 999px; padding: 3px 10px; font-size: 0.85em; font-variant-numeric: tabular-nums; }
+    .gen-chip:hover { background: rgba(255,255,255,0.2); }
+    .gen-chip:focus-visible { outline: 3px solid #29b6f6; }
     .gen-chip.done { background: #2e7d32; }
+    .gen-chip.done:hover { background: #388e3c; }
     #search { flex: 1 1 180px; min-width: 140px; padding: 8px 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.1); color: #fff; font-weight: 600; outline: none; }
     #search::placeholder { color: rgba(255,255,255,0.55); }
     .toggle { display: flex; align-items: center; gap: 6px; font-weight: 700; user-select: none; cursor: pointer; }
@@ -76,6 +79,9 @@
   const statusEl = document.getElementById('status');
   const searchEl = document.getElementById('search');
   const missingEl = document.getElementById('only-missing');
+
+  const catchSound = new Audio('audio/catch.mp3');
+  catchSound.preload = 'auto';
 
   let caught = loadCaught();
   const cards = new Map(); // id -> { el, name, gen }
@@ -156,8 +162,11 @@
       section.append(h2, grid);
       dexEl.appendChild(section);
 
-      const chip = document.createElement('span');
+      const chip = document.createElement('button');
+      chip.type = 'button';
       chip.className = 'gen-chip';
+      chip.title = `Jump to Gen ${GEN_NAMES[i]}`;
+      chip.addEventListener('click', () => jumpTo(section));
       statsEl.appendChild(chip);
       genInfo.push({ ids: [], chip, count, section, grid });
     });
@@ -186,8 +195,22 @@
     }
   }
 
+  // Instant jump, offset so the sticky top bar doesn't cover the heading.
+  function jumpTo(section) {
+    if (section.classList.contains('hidden')) return;
+    const offset = document.getElementById('topbar').offsetHeight + 8;
+    window.scrollTo({ top: section.getBoundingClientRect().top + window.scrollY - offset, behavior: 'instant' });
+  }
+
+  function playCatch() {
+    try {
+      catchSound.currentTime = 0;
+      catchSound.play().catch(() => {});
+    } catch {}
+  }
+
   function toggle(id) {
-    if (caught.has(id)) caught.delete(id); else caught.add(id);
+    if (caught.has(id)) caught.delete(id); else { caught.add(id); playCatch(); }
     saveCaught();
     refresh();
   }
